@@ -1,11 +1,11 @@
 import express, { json } from 'express'
 import connectdb from './config/db.js'
 import cors from 'cors'
-import CompanyRoute from './route/CompanyRoutes.js'       
+import CompanyRoute from './route/CompanyRoutes.js'
 import DepartmentRoute from './route/DepartmentRoute.js'
 import DesignationRoute from './route/DesignationRoute.js'
 import EmployeeStatusRoute from './route/EmploymentStatusRoute.js'
-import RoleRoute from './route/RoleRoutes.js' 
+import RoleRoute from './route/RoleRoutes.js'
 import UserRoute from './route/UserRoute.js'
 import WorkShiftRoute from './route/WorkShiftRoute.js'
 import permissionRoute from './route/permissionRoute.js'
@@ -25,13 +25,13 @@ import cookieParser from 'cookie-parser'
 import { startScheduler } from './utills/scheduler.js'
 
 import EnvData from './config/EnvData.js'
-const app= express();
+const app = express();
 app.use(express.json({ limit: "10mb" }))  // raised for lead batch imports (500 rows ~150kb each)
 app.use(cookieParser())
 
 const allowedOrigins = EnvData.CLIENT_URL
     ? EnvData.CLIENT_URL.split(",").map(o => o.trim())
-    : ["http://localhost:5173","http://localhost:5174","http://localhost:5175"];
+    : ["http://localhost:5173", "http://localhost:5174", "http://localhost:5175", "https://developmenthrms-frontend.vercel.app/"];
 
 app.use(cors({
     origin: (origin, callback) => {
@@ -76,7 +76,7 @@ app.use('/api/health', (req, res) => {
 
 
 
-const server = app.listen(EnvData.PORT,()=>{
+const server = app.listen(EnvData.PORT, () => {
     connectdb()
     startScheduler()
     console.log(`Server is running on port ${EnvData.PORT}`)
