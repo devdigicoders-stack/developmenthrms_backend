@@ -1,38 +1,57 @@
 import multer from "multer";
-import cloudinary from "../utills/cloudinary.js";
+import path from "path";
+import fs from "fs";
 
-const upload = multer({
-    storage: multer.memoryStorage(),
-    limits: { fileSize: 50 * 1024 * 1024 },  // 50 MB — covers large lead CSV files
+// Ensure uploads directory exists
+const uploadDir = path.join(process.cwd(), "uploads");
+if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        cb(null, uploadDir);
+    },
+    filename: function (req, file, cb) {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        const ext = file.originalname.split('.').pop();
+        // create a clean filename
+        cb(null, file.fieldname + '-' + uniqueSuffix + '.' + ext);
+    }
 });
 
-const getResourceType = (mimetype = "") => {
-    if (mimetype.startsWith("image/")) return "image";
-    if (mimetype.startsWith("video/")) return "video";
-    return "raw";
+const upload = multer({
+    storage: storage,
+    limits: { fileSize: 50 * 1024 * 1024 },  // 50 MB
+});
+
+export const uploadToCloudinary = async (file, folder = "local") => {
+    // The file is already saved by multer diskStorage
+    const baseUrl = process.env.BACKEND_URL || "http://localhost:8008";
+    return {
+        name: file.originalname,
+        url: `${baseUrl}/uploads/${file.filename}`,
+        publicId: file.filename,
+        resourceType: "local",
+    };
 };
-
-export const uploadToCloudinary = (file, folder = "digicoders/hrmsv2") =>
-    new Promise((resolve, reject) => {
-        const resource_type = getResourceType(file.mimetype);
-
-        const stream = cloudinary.uploader.upload_stream(
-            { folder, resource_type },
-            (error, result) => {
-                if (error) return reject(error);
-                resolve({
-                    name: file.originalname,
-                    url: result.secure_url,
-                    publicId: result.public_id,
-                    resourceType: resource_type,
-                });
-            }
-        );
-
-        stream.end(file.buffer);
-    });
 
 export const uploadManyToCloudinary = (files = [], folder) =>
     Promise.all(files.map(f => uploadToCloudinary(f, folder)));
+
+export const uploadBufferToCloudinary = async (buffer, mimetype, filename, folder = "local") => {
+    const ext = filename.split('.').pop() || "bin";
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const localFileName = `buffer-${uniqueSuffix}.${ext}`;
+    const filePath = path.join(uploadDir, localFileName);
+    
+    fs.writeFileSync(filePath, buffer);
+
+    const baseUrl = process.env.BACKEND_URL || "http://localhost:8008";
+    return {
+        url: `${baseUrl}/uploads/${localFileName}`,
+        publicId: localFileName,
+    };
+};
 
 export default upload;

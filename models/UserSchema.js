@@ -108,6 +108,11 @@ const UserSchema = new mongoose.Schema({
     otpExpiry: {
         type: Date,
     },
+    onboardingStatus: {
+        type: String,
+        enum: ["pending_form", "pending_approval", "approved"],
+        default: "pending_form"
+    },
     isActive: {
         type: Boolean,
         default: true

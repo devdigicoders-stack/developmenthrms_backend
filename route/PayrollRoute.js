@@ -7,7 +7,7 @@ import {
 import {
     generatePayroll, getPayrollRuns, getMyPayslips,
     approvePayroll, bulkApprovePayroll, markPayrollPaid, bulkMarkPaid,
-    deletePayrollRun, getPayrollSummary,
+    deletePayrollRun, getPayrollSummary, addManualAdjustment,
 } from "../controller/PayrollController.js";
 
 const router = express.Router();
@@ -27,6 +27,7 @@ router.patch("/run/bulk-approve",          protect, hasPermission("APPROVE_PAYRO
 router.patch("/run/bulk-mark-paid",        protect, hasPermission("APPROVE_PAYROLL"), bulkMarkPaid);
 router.patch("/run/:id/approve",           protect, hasPermission("APPROVE_PAYROLL"), approvePayroll);
 router.patch("/run/:id/mark-paid",         protect, hasPermission("APPROVE_PAYROLL"), markPayrollPaid);
+router.patch("/run/:id/adjustment",        protect, hasPermission("MANAGE_PAYROLL"), addManualAdjustment);
 router.delete("/run/:id",                  protect, hasPermission("MANAGE_PAYROLL"), deletePayrollRun);
 
 // Employee — own payslips

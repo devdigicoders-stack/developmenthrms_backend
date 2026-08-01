@@ -105,12 +105,18 @@ export const generatePayroll = async (req, res) => {
 
                 // LOP = absent days not covered by paid leave
                 const effectivePaidLeave = Math.min(paidLeaveDays, calculatedAbsent);
-                const lopDays = parseFloat((Math.max(0, calculatedAbsent - effectivePaidLeave) + (halfDays * 0.5)).toFixed(2));
+                let lopDays = parseFloat((Math.max(0, calculatedAbsent - effectivePaidLeave) + (halfDays * 0.5)).toFixed(2));
+
+                // Cap LOP days to total working days to prevent negative salaries from over-attendance
+                if (lopDays > totalWorkingDays) {
+                    lopDays = totalWorkingDays;
+                }
 
                 // Compute salary components
                 const grossForCalc = structure.grossEarnings > 0 ? structure.grossEarnings : structure.basic;
                 const perDaySalary = grossForCalc / totalWorkingDays;
-                const lopDeduction = parseFloat((lopDays * perDaySalary).toFixed(2));
+                
+                let lopDeduction = parseFloat((lopDays * perDaySalary).toFixed(2));
 
                 // Build component list with resolved amounts
                 const components = [
@@ -342,6 +348,45 @@ export const getPayrollSummary = async (req, res) => {
         };
 
         res.status(200).json({ summary, success: true });
+    } catch (err) {
+        res.status(500).json({ message: err.message, success: false });
+    }
+};
+
+// PATCH /api/payroll/run/:id/adjustment  — manual adjustment
+export const addManualAdjustment = async (req, res) => {
+    try {
+        const { name, type, amount } = req.body;
+        if (!name || !type || !amount) {
+            return res.status(400).json({ message: "Name, type, and amount are required", success: false });
+        }
+        
+        const numAmount = parseFloat(Number(amount).toFixed(2));
+        if (numAmount <= 0) {
+            return res.status(400).json({ message: "Amount must be greater than zero", success: false });
+        }
+
+        const run = await PayrollRun.findById(req.params.id);
+        if (!run) return res.status(404).json({ message: "Payroll record not found", success: false });
+        if (run.status !== "draft") return res.status(400).json({ message: "Only draft payroll can be manually adjusted", success: false });
+
+        run.components.push({
+            name,
+            type, // "earning" or "deduction"
+            amount: numAmount
+        });
+
+        // Recalculate totals
+        const grossEarnings = run.components.filter(c => c.type === "earning").reduce((s, c) => s + c.amount, 0);
+        const totalDeductions = run.components.filter(c => c.type === "deduction").reduce((s, c) => s + c.amount, 0);
+        
+        run.grossEarnings = parseFloat(grossEarnings.toFixed(2));
+        run.totalDeductions = parseFloat(totalDeductions.toFixed(2));
+        run.netSalary = parseFloat((grossEarnings - totalDeductions).toFixed(2));
+        run.updatedBy = req.user.userId;
+
+        await run.save();
+        res.status(200).json({ message: "Adjustment added successfully", success: true });
     } catch (err) {
         res.status(500).json({ message: err.message, success: false });
     }

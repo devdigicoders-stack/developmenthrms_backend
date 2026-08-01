@@ -108,6 +108,7 @@ export const createCompanyWithAdmin = async (req, res) => {
             companyId: company._id,
             employeeCode: "ADMIN001", // default admin employee code
             joiningDate: new Date(),
+            onboardingStatus: "approved"
         });
         await adminUser.save();
 

@@ -6,6 +6,7 @@ export const permission = {
         DELETE_USER: "DELETE_USER",
         VIEW_USER: "VIEW_USER",
         VIEW_ALL_USERS: "VIEW_ALL_USERS",
+        APPROVE_ONBOARDING: "APPROVE_ONBOARDING",
     },
     Role: {
         Create_ROLE: "Create_ROLE",

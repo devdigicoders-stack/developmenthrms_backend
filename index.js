@@ -1,4 +1,6 @@
 import express, { json } from 'express'
+import path from 'path';
+import { fileURLToPath } from 'url';
 import connectdb from './config/db.js'
 import cors from 'cors'
 import CompanyRoute from './route/CompanyRoutes.js'
@@ -23,11 +25,18 @@ import QuoteRoute from './route/QuoteRoute.js'
 import QuoteProfileRoute from './route/QuoteProfileRoute.js'
 import cookieParser from 'cookie-parser'
 import { startScheduler } from './utills/scheduler.js'
+import PolicyRoute from './route/PolicyRoute.js'
+import NdaRoute from './route/NdaRoute.js'
+import OnboardingRoute from './route/OnboardingRoute.js'
 
 import EnvData from './config/EnvData.js'
 const app = express();
 app.use(express.json({ limit: "10mb" }))  // raised for lead batch imports (500 rows ~150kb each)
 app.use(cookieParser())
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 const allowedOrigins = EnvData.CLIENT_URL
     ? EnvData.CLIENT_URL.split(",").map(o => o.trim())
@@ -62,6 +71,9 @@ app.use('/api/tasks', TaskRoute);
 app.use('/api/leads', LeadRoute);
 app.use('/api/quotes', QuoteRoute);
 app.use('/api/quote-profiles', QuoteProfileRoute);
+app.use('/api/policies', PolicyRoute);
+app.use('/api/nda', NdaRoute);
+app.use('/api/onboarding', OnboardingRoute);
 
 app.get('/', (req, res) => {
     res.send("API is running")
