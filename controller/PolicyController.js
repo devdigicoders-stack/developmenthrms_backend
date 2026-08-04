@@ -72,3 +72,19 @@ export const getAllPolicies = async (req, res) => {
         res.status(500).json({ message: "Error fetching policies", success: false });
     }
 };
+
+// Admin deletes a policy
+export const deletePolicy = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const policy = await Policy.findById(id);
+        if (!policy) {
+            return res.status(404).json({ message: "Policy not found", success: false });
+        }
+        await Policy.findByIdAndDelete(id);
+        res.status(200).json({ message: "Policy deleted successfully", success: true });
+    } catch (error) {
+        console.error("Policy Delete Error:", error);
+        res.status(500).json({ message: "Error deleting policy", success: false });
+    }
+};

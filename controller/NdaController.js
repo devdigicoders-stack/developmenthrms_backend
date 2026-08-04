@@ -29,7 +29,12 @@ export const createOrUpdateNda = async (req, res) => {
             const ext = path.extname(req.file.originalname) || '';
             const filename = `original_nda_${Date.now()}${ext}`;
             const filePath = path.join(uploadDir, filename);
-            fs.writeFileSync(filePath, req.file.buffer);
+            
+            const fileData = fs.readFileSync(req.file.path);
+            fs.writeFileSync(filePath, fileData);
+            
+            // Delete temp file created by multer
+            try { fs.unlinkSync(req.file.path); } catch (e) {}
             
             documentUrl = `${req.protocol}://${req.get('host')}/uploads/ndas/${filename}`;
         }

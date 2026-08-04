@@ -4,7 +4,8 @@ import { createNotification } from "../utills/notificationHelper.js";
 import { stripSuperAdminOnlyPermissions } from "../config/superAdminOnly.js";
 export const createRole = async (req, res) => {
     try {
-        const { name, permissions } = req.body;
+        let { name, permissions } = req.body;
+        if (name) name = name.trim();
         const { userId } = req.user;
         const companyId = req.body.companyId || req.user.company; // Allow companyId from body or fallback to user's company
         if (!name) {
@@ -110,7 +111,8 @@ export const getAllCompanyRoles = async (req, res) => {
 export const updateRole = async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, permissions, status, companyId } = req.body;
+        let { name, permissions, status, companyId } = req.body;
+        if (name) name = name.trim();
         const role = await Role.findById(id);
         if (!role) {
             return res.status(404).json({ message: "Role not found", success: false });

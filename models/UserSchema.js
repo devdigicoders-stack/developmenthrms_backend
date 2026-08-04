@@ -110,7 +110,7 @@ const UserSchema = new mongoose.Schema({
     },
     onboardingStatus: {
         type: String,
-        enum: ["pending_form", "pending_approval", "approved"],
+        enum: ["pending_form", "pending_approval", "approved", "rejected"],
         default: "pending_form"
     },
     isActive: {

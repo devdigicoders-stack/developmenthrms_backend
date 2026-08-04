@@ -123,6 +123,8 @@ export const loginUser = async (req, res) => {
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) return res.status(400).json({ message: "Invalid credentials", success: false });
         if (!user.isActive) return res.status(403).json({ message: "Your account has been disabled. Please contact your administrator.", success: false, blocked: true });
+        if (user.onboardingStatus === "rejected") return res.status(403).json({ message: "Your application has been rejected. You cannot login.", success: false, blocked: true });
+        
         if (user.role?.name !== "super_admin" && user.companyId) {
             const company = await Company.findById(user.companyId._id).select("status");
             if (!company || !company.status) return res.status(403).json({ message: "Your company account has been deactivated. Please contact support.", success: false, blocked: true });

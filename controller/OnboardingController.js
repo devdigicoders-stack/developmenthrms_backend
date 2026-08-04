@@ -3,6 +3,7 @@ import User from "../models/UserSchema.js";
 import SalaryStructure from "../models/SalaryStructureSchema.js";
 import { uploadToCloudinary } from "../middleware/multer.js";
 import { sendMail } from "../utills/SendEmail.js";
+import puppeteer from "puppeteer";
 
 // Helper to handle optional file uploads
 const handleFileUpload = async (files, fieldName, folder) => {
@@ -219,5 +220,149 @@ export const getMyOfferLetter = async (req, res) => {
     } catch (error) {
         console.error("Get Offer Letter Error:", error);
         res.status(500).json({ message: "Failed to fetch offer letter", success: false });
+    }
+};
+
+export const rejectOnboarding = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const form = await OnboardingForm.findById(id).populate("user");
+        if (!form) return res.status(404).json({ message: "Onboarding form not found", success: false });
+
+        if (form.status === "approved") {
+            return res.status(400).json({ message: "Already approved", success: false });
+        }
+
+        // Reject form
+        form.status = "rejected";
+        form.reviewedBy = req.user.userId;
+        await form.save();
+
+        // Update user status
+        const user = form.user;
+        user.onboardingStatus = "rejected";
+        await user.save();
+
+        res.status(200).json({ message: "Employee rejected successfully", success: true });
+    } catch (error) {
+        console.error("Reject Onboarding Error:", error);
+        res.status(500).json({ message: "Failed to reject employee", success: false });
+    }
+};
+
+export const downloadOfferLetterPdf = async (req, res) => {
+    try {
+        const userId = req.user.userId;
+        const user = await User.findById(userId).populate("companyId designation role");
+        if (!user) return res.status(404).json({ message: "User not found", success: false });
+
+        if (user.onboardingStatus !== "approved") {
+            return res.status(403).json({ message: "Offer letter is only available after approval.", success: false });
+        }
+
+        const salary = await SalaryStructure.findOne({ userId }).sort({ createdAt: -1 });
+        if (!salary) {
+            return res.status(404).json({ message: "Salary structure not found", success: false });
+        }
+
+        const company = user.companyId;
+        const ctc = salary.ctc;
+        const basic = salary.basic;
+        const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+        const joinDate = new Date(salary.createdAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+        const currentYear = new Date().getFullYear();
+        const logoUrl = company?.icon?.url || '';
+
+        const htmlContent = `
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+                <meta charset="UTF-8">
+                <style>
+                    body { font-family: 'Helvetica', 'Arial', sans-serif; color: #333; padding: 40px; position: relative; }
+                    .watermark { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.15; width: 85%; z-index: -1; pointer-events: none; }
+                    .header { text-align: center; margin-bottom: 20px; }
+                    .header img { height: 80px; }
+                    .title { text-align: center; font-size: 20px; font-weight: bold; text-decoration: underline; margin-bottom: 45px; }
+                    .content { font-size: 14.5px; line-height: 1.6; text-align: justify; z-index: 1; position: relative; }
+                    .content p { margin-bottom: 12px; }
+                    .list-docs { margin-left: 20px; margin-bottom: 20px; line-height: 1.8; }
+                    .signatures { margin-top: 40px; }
+                    .signatures p { margin: 5px 0; }
+                    .page-break { page-break-before: always; }
+                    .footer-sig { display: flex; align-items: flex-end; margin-top: 40px; }
+                </style>
+            </head>
+            <body>
+                <img src="${logoUrl}" class="watermark" />
+                <div class="header">
+                    <img src="${logoUrl}" alt="Company Logo" />
+                </div>
+                
+                <div class="title">Offer Letter</div>
+                
+                <div class="content">
+                    <p>Dated: ${today}</p>
+                    <p>Mr ${user.firstName} ${user.lastName}</p>
+                    <p>B/o ${user.address || "Address"}</p>
+                    <p>Dear ${user.firstName},</p>
+                    
+                    <p>We are pleased to inform you that, with reference to your application and subsequent interview you had with us, we are pleased to offer you as a <strong>"${user.designation?.name || user.role?.name || 'Developer'}"</strong> at our Corporate Head Office - Lucknow, on the terms and conditions discussed and agreed by you at the time of your interview. You are requested to join us on <strong>${joinDate}</strong> as agreed by you. Your monthly remuneration will be ${ctc?.toLocaleString("en-IN")} INR and Your work timings will be <strong>10:00AM to 07:00PM, Monday to Saturday</strong>. You will be on probation period for first 3 months, after serving the probation period your performance and efforts will be reviewed to continue as permanent employee in ${company?.name || 'DigiCoders'}. You will also get some incentive & increment for your Better Performance.</p>
+                    
+                    <p>We Will also review your performance and work every year and you will get benefits as per them. And your salary will be revised as per performance.</p>
+                    
+                    <p>As per the acceptance of this offer letter, you will also accept the attached Working Terms and Conditions (Annexure-I) and Non-Disclosure Agreement (Annexure-II) as per the joining rules and regulation. You will serve not less than 1 month of notice period when you decide to discontinue with your role at ${company?.name || 'DigiCoders'}.</p>
+                    
+                    <p>Your first salary will be credited after 45 days of working, 15 days salary will be hold for the security deposited, it will be settled with your last salary from company (FnF Settlement, 60 Days after Reliving).</p>
+                    
+                    <p>This above offer is subject to yours being medically found fit and your document and background check being found satisfactory on verification. You should have your independent movement for performing your duties hence you are required to maintain own transportation.</p>
+                    
+                    <p>Now therefore, you are requested to submit one set copies of the following documents to us at the time of your joining. You are also advised to bring originals along with the copies same will be returned immediately after our verification.</p>
+                    
+                    <div class="list-docs">
+                        1. Educational certificates, 2 References.<br>
+                        2. Four passport size color photographs.<br>
+                        3. Two copies of Photo ID with Address Proof.
+                    </div>
+                </div>
+                
+                <div class="page-break"></div>
+                <img src="${logoUrl}" class="watermark" />
+                
+                <div class="content" style="margin-top: 40px;">
+                    <p>Please sign and return to the undersigned the duplicate copy of this letter signifying your acceptance.</p>
+                    
+                    <p>We welcome you to ${company?.name || 'DigiCoders'} family and look forward to a fruitful collaboration. We are confident that your contribution will take us further in our journey towards becoming world leaders. We assure you of our support for your professional development and growth.</p>
+                    
+                    <div class="signatures">
+                        <p>Best Regards,</p>
+                        <br>
+                        <p>Manager - Human Resources</p>
+                        <p>${company?.name || 'DigiCoders Technologies Private Limited'}</p>
+                    </div>
+                    
+                    <div class="footer-sig">
+                        <p>I, ___________________________, accept the above offer and will begin the internship position on ${joinDate}.<br><br>Signature_________________________.</p>
+                    </div>
+                </div>
+            </body>
+            </html>
+        `;
+
+        const browser = await puppeteer.launch({ headless: 'new', args: ['--no-sandbox'] });
+        const page = await browser.newPage();
+        await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
+        const pdfBuffer = await page.pdf({ format: 'A4', printBackground: true, margin: { top: '20px', bottom: '20px' } });
+        await browser.close();
+
+        res.set({
+            'Content-Type': 'application/pdf',
+            'Content-Disposition': 'attachment; filename="Offer_Letter.pdf"'
+        });
+        res.send(pdfBuffer);
+    } catch (error) {
+        console.error("Download Offer Letter Error:", error);
+        res.status(500).json({ message: "Failed to generate offer letter PDF", success: false });
     }
 };

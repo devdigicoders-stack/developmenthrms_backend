@@ -1,7 +1,7 @@
 import express from "express";
 import { protect, hasPermission } from "../middleware/authMiddleware.js";
 import upload from "../middleware/multer.js";
-import { submitOnboardingForm, getPendingOnboardingRequests, approveOnboarding, getMyOfferLetter } from "../controller/OnboardingController.js";
+import { submitOnboardingForm, getPendingOnboardingRequests, approveOnboarding, rejectOnboarding, getMyOfferLetter, downloadOfferLetterPdf } from "../controller/OnboardingController.js";
 
 const router = express.Router();
 
@@ -26,6 +26,8 @@ const uploadFields = upload.fields([
 router.post("/submit", protect, uploadFields, submitOnboardingForm);
 router.get("/requests", protect, hasPermission("MANAGE_USER", "APPROVE_ONBOARDING"), getPendingOnboardingRequests);
 router.post("/approve/:id", protect, hasPermission("MANAGE_USER", "APPROVE_ONBOARDING"), approveOnboarding);
+router.post("/reject/:id", protect, hasPermission("MANAGE_USER", "APPROVE_ONBOARDING"), rejectOnboarding);
 router.get("/my-offer-letter", protect, getMyOfferLetter);
+router.get("/my-offer-letter/download", protect, downloadOfferLetterPdf);
 
 export default router;
