@@ -3,6 +3,7 @@ import User from "../models/UserSchema.js";
 import SalaryStructure from "../models/SalaryStructureSchema.js";
 import { uploadToCloudinary } from "../middleware/multer.js";
 import { sendMail } from "../utills/SendEmail.js";
+import { generateOfferPdfBuffer } from "../utills/offerPdfGenerator.js";
 import puppeteer from "puppeteer";
 
 // Helper to handle optional file uploads
@@ -138,7 +139,9 @@ export const approveOnboarding = async (req, res) => {
             return res.status(400).json({ message: "Basic salary is required for approval", success: false });
         }
 
-        const form = await OnboardingForm.findById(id).populate("user");
+        const form = await OnboardingForm.findById(id)
+            .populate({ path: "user", populate: [{ path: "role" }, { path: "designation" }] })
+            .populate("companyId");
         if (!form) return res.status(404).json({ message: "Onboarding form not found", success: false });
 
         if (form.status === "approved") {
@@ -158,7 +161,7 @@ export const approveOnboarding = async (req, res) => {
         // Create Salary Structure
         const salary = new SalaryStructure({
             userId: user._id,
-            companyId: form.companyId,
+            companyId: form.companyId._id,
             ctc: basicSalary, // Setting the overall CTC
             basic: Math.round(basicSalary * 0.4), // 40% of CTC for Basic
             effectiveFrom: new Date().toISOString().slice(0, 7), // "YYYY-MM" format usually
@@ -168,19 +171,124 @@ export const approveOnboarding = async (req, res) => {
         await salary.save();
 
         // Send Offer Letter Email
-        const msg = `
-            <h2>Offer Letter from HRMS</h2>
-            <p>Dear ${user.firstName} ${user.lastName},</p>
-            <p>We are thrilled to offer you a position at our company. Your onboarding application has been formally approved.</p>
-            <p><strong>Your CTC (Basic Salary) has been fixed at: ₹${basicSalary} per month.</strong></p>
-            <p>You can now log in to the dashboard to access your employee portal, view attendance, and manage your leaves.</p>
-            <p>Welcome to the team!</p>
-            <br/>
-            <p>Best Regards,</p>
-            <p>HR Department</p>
+        const emailMsg = `
+            <div style="font-family: Arial, sans-serif; padding: 20px; line-height: 1.6; color: #333; max-width: 600px;">
+                <p>Dear ${user.firstName} ${user.lastName},</p>
+                <p>Congratulations!</p>
+                <p>We are delighted to inform you that your onboarding process has been successfully completed and approved by the management.</p>
+                <p>It is our pleasure to officially welcome you to Digicoder Private Limited. Please find your Offer Letter attached to this email in PDF format. Kindly review the document carefully and keep it for your records.</p>
+                <p>Your employee dashboard has been activated successfully. You can log in using your assigned credentials to:</p>
+                <ul style="line-height: 1.8;">
+                    <li>Access your daily tasks</li>
+                    <li>Mark and view your attendance</li>
+                    <li>Apply for and track leave requests</li>
+                    <li>Stay updated with company activities and announcements</li>
+                </ul>
+                <p>We are excited to have you as a part of our team. We believe your skills, dedication, and enthusiasm will contribute significantly to our organization's growth and success.</p>
+                <p>Should you have any questions or require any assistance, please feel free to contact the HR Department.</p>
+                <p>We wish you a successful and rewarding journey with Digicoder Private Limited.</p>
+                <br/>
+                <p style="margin-bottom: 5px;">Warm Regards,</p>
+                <p style="margin: 0;"><strong>Human Resources Department</strong></p>
+                <p style="margin: 0;">Digicoder Private Limited</p>
+            </div>
         `;
-        
-        await sendMail({ email: user.email, title: "Offer Letter - Application Approved! 🎉", msg });
+
+        const company = form.companyId;
+        const dateOptions = { month: 'long', day: 'numeric', year: 'numeric' };
+        const today = new Date().toLocaleDateString('en-US', dateOptions);
+        const joinDate = new Date(user.dateOfJoining || Date.now()).toLocaleDateString('en-US', dateOptions);
+        const roleName = user.designation?.name || user.role?.name || 'Developer';
+        const companyName = company?.name || 'DigiCoders';
+
+        const pdfHtml = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <style>
+                    body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 0; margin: 0; color: #333; }
+                    .page { width: 210mm; min-height: 297mm; padding: 20mm; box-sizing: border-box; position: relative; margin: 0 auto; background: white; page-break-after: always; }
+                    .watermark { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.15; width: 85%; z-index: 0; }
+                    .content-wrapper { position: relative; z-index: 10; font-size: 14px; line-height: 1.6; text-align: justify; }
+                    .header-logo { text-align: center; margin-bottom: 20px; }
+                    .header-logo img { height: 60px; object-fit: contain; }
+                    .header-title { text-align: center; font-size: 24px; font-weight: 900; color: #111; margin-bottom: 20px; }
+                    .title { text-align: center; font-weight: bold; font-size: 20px; text-decoration: underline; margin-bottom: 40px; text-underline-offset: 4px; }
+                    p { margin-bottom: 12px; }
+                    .mt-3 { margin-top: 12px; }
+                    .mt-8 { margin-top: 32px; }
+                    .mt-12 { margin-top: 48px; }
+                    .mt-16 { margin-top: 64px; }
+                    .ml-6 { margin-left: 24px; }
+                    .leading-loose { line-height: 2; }
+                    .flex-end { display: flex; align-items: flex-end; }
+                </style>
+            </head>
+            <body>
+                <!-- Page 1 -->
+                <div class="page">
+                    ${company?.icon?.url ? '<img src="' + company.icon.url + '" class="watermark" />' : ''}
+                    <div class="content-wrapper">
+                        <div class="header-logo">
+                            ${company?.icon?.url ? '<img src="' + company.icon.url + '" />' : '<div class="header-title">' + companyName + '</div>'}
+                        </div>
+                        <div class="title">Offer Letter</div>
+                        <p>Dated: ${today}</p>
+                        <p>Mr ${user.firstName} ${user.lastName}</p>
+                        <p>B/o ${user.address || "Address"}</p>
+                        <p class="mt-3">Dear ${user.firstName},</p>
+                        <p>We are pleased to inform you that, with reference to your application and subsequent interview you had with us, we are pleased to offer you as a <strong>"${roleName}"</strong> at our Corporate Head Office - Lucknow, on the terms and conditions discussed and agreed by you at the time of your interview. You are requested to join us on <strong>${joinDate}</strong> as agreed by you. Your monthly remuneration will be ${Number(basicSalary).toLocaleString("en-IN")} INR and Your work timings will be <strong>10:00AM to 07:00PM, Monday to Saturday</strong>. You will be on probation period for first 3 months, after serving the probation period your performance and efforts will be reviewed to continue as permanent employee in ${companyName}. You will also get some incentive & increment for your Better Performance.</p>
+                        <p>We Will also review your performance and work every year and you will get benefits as per them. And your salary will be revised as per performance.</p>
+                        <p>As per the acceptance of this offer letter, you will also accept the attached Working Terms and Conditions (Annexure-I) and Non-Disclosure Agreement (Annexure-II) as per the joining rules and regulation. You will serve not less than 1 month of notice period when you decide to discontinue with your role at ${companyName}.</p>
+                        <p>Your first salary will be credited after 45 days of working, 15 days salary will be hold for the security deposited, it will be settled with your last salary from company (FnF Settlement, 60 Days after Reliving).</p>
+                        <p>This above offer is subject to yours being medically found fit and your document and background check being found satisfactory on verification. You should have your independent movement for performing your duties hence you are required to maintain own transportation.</p>
+                        <p>Now therefore, you are requested to submit one set copies of the following documents to us at the time of your joining. You are also advised to bring originals along with the copies same will be returned immediately after our verification.</p>
+                        <div class="ml-6 leading-loose">
+                            1. Educational certificates, 2 References.<br/>
+                            2. Four passport size color photographs.<br/>
+                            3. Two copies of Photo ID with Address Proof.
+                        </div>
+                    </div>
+                </div>
+                <!-- Page 2 -->
+                <div class="page">
+                    ${company?.icon?.url ? '<img src="' + company.icon.url + '" class="watermark" />' : ''}
+                    <div class="content-wrapper">
+                        <p class="mt-8">Please sign and return to the undersigned the duplicate copy of this letter signifying your acceptance.</p>
+                        <p>We welcome you to ${companyName} family and look forward to a fruitful collaboration. We are confident that your contribution will take us further in our journey towards becoming world leaders. We assure you of our support for your professional development and growth.</p>
+                        <div class="mt-12">
+                            <p style="margin-bottom: 24px;">Best Regards,</p>
+                            <p>Manager - Human Resources</p>
+                            <p><strong>${companyName}</strong></p>
+                        </div>
+                        <div class="mt-16 flex-end">
+                            <p>I, ___________________________, accept the above offer and will begin the internship position on ${joinDate}.<br/><br/><br/>Signature_________________________.</p>
+                        </div>
+                    </div>
+                </div>
+            </body>
+            </html>
+        `;
+
+        try {
+            const pdfBuffer = await generateOfferPdfBuffer(pdfHtml);
+            await sendMail({ 
+                email: user.email, 
+                title: "Offer Letter – Welcome to Digicoder Private Limited", 
+                msg: emailMsg,
+                attachments: [
+                    {
+                        filename: `Offer_Letter_${user.firstName}_${user.lastName}.pdf`,
+                        content: pdfBuffer,
+                        contentType: 'application/pdf'
+                    }
+                ]
+            });
+        } catch (mailErr) {
+            console.error("Error generating or sending PDF email:", mailErr);
+            // Fallback to sending just the email if PDF fails
+            await sendMail({ email: user.email, title: "Offer Letter – Welcome to Digicoder Private Limited", msg: emailMsg });
+        }
 
         res.status(200).json({ message: "Employee approved successfully", success: true });
     } catch (error) {

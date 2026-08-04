@@ -223,7 +223,7 @@ export const getAllQuotes = async (req, res) => {
     try {
         const companyId = req.user.company || null; // JWT stores company field
         const { status, search, page = 1, limit = 30 } = req.query;
-        const filter = { companyId };
+        const filter = { companyId: { $in: [companyId, null] } };
         if (status) {
             const VALID = ["draft", "sent", "accepted", "rejected"];
             if (!VALID.includes(status)) return res.status(400).json({ message: "Invalid status filter", success: false });
@@ -260,7 +260,7 @@ export const getQuotesByLead = async (req, res) => {
         const { leadId } = req.params;
         const companyId = req.query.companyId || req.user.company || null;
 
-        const quotes = await Quote.find({ leadId, companyId })
+        const quotes = await Quote.find({ leadId, companyId: { $in: [companyId, null] } })
             .populate("createdBy", "firstName lastName email")
             .populate("updatedBy", "firstName lastName email")
             .populate("leadId", "orgName contactPerson email contactNumber")
@@ -279,7 +279,7 @@ export const getQuoteById = async (req, res) => {
         const { quoteId } = req.params;
         const companyId = req.user.company;
 
-        const quote = await Quote.findOne({ _id: quoteId, companyId }).populate(quotePopulate);
+        const quote = await Quote.findOne({ _id: quoteId, companyId: { $in: [companyId, null] } }).populate(quotePopulate);
 
         if (!quote) {
             return res.status(404).json({ message: "Quote not found", success: false });
@@ -297,7 +297,7 @@ export const updateQuote = async (req, res) => {
         const { quoteId } = req.params;
         const userId = req.user.userId;
         const companyId = req.user.company;
-        const existing = await Quote.findOne({ _id: quoteId, companyId });
+        const existing = await Quote.findOne({ _id: quoteId, companyId: { $in: [companyId, null] } });
         if (!existing) {
             return res.status(404).json({ message: "Quote not found", success: false });
         }
@@ -414,7 +414,7 @@ export const deleteQuote = async (req, res) => {
         const { quoteId } = req.params;
         const userId = req.user.userId;
         const companyId = req.user.company;
-        const quote = await Quote.findOne({ _id: quoteId, companyId }).populate("leadId", "orgName");
+        const quote = await Quote.findOne({ _id: quoteId, companyId: { $in: [companyId, null] } }).populate("leadId", "orgName");
         if (!quote) {
             return res.status(404).json({ message: "Quote not found", success: false });
         }
@@ -476,7 +476,7 @@ export const getQuoteHTML = async (req, res) => {
     try {
         const { quoteId } = req.params;
         const companyId = req.user.company;
-        const quote = await Quote.findOne({ _id: quoteId, companyId })
+        const quote = await Quote.findOne({ _id: quoteId, companyId: { $in: [companyId, null] } })
             .populate("leadId", "orgName contactPerson email contactNumber address status customFields")
             .populate("createdBy", "firstName lastName email");
 
@@ -497,7 +497,7 @@ export const getQuoteSendDefaults = async (req, res) => {
     try {
         const { quoteId } = req.params;
         const companyId = req.user.company;
-        const quote = await Quote.findOne({ _id: quoteId, companyId })
+        const quote = await Quote.findOne({ _id: quoteId, companyId: { $in: [companyId, null] } })
             .populate("leadId", "orgName contactPerson email contactNumber address status customFields")
             .populate("createdBy", "firstName lastName email");
 
@@ -544,7 +544,7 @@ export const sendQuoteToCustomer = async (req, res) => {
         const userId    = req.user.userId;
         const companyId = req.user.company;
 
-        const quote = await Quote.findOne({ _id: quoteId, companyId })
+        const quote = await Quote.findOne({ _id: quoteId, companyId: { $in: [companyId, null] } })
             .populate("leadId", "orgName contactPerson email contactNumber address status customFields")
             .populate("createdBy", "firstName lastName email");
 
@@ -697,7 +697,7 @@ export const addQuoteFollowUp = async (req, res) => {
             return res.status(400).json({ message: "Invalid follow-up date", success: false });
         }
 
-        const quote = await Quote.findOne({ _id: quoteId, companyId });
+        const quote = await Quote.findOne({ _id: quoteId, companyId: { $in: [companyId, null] } });
         if (!quote) {
             return res.status(404).json({ message: "Quote not found", success: false });
         }
@@ -739,7 +739,7 @@ export const updateQuoteFollowUp = async (req, res) => {
         const userId    = req.user.userId;
         const companyId = req.user.company;
 
-        const quote = await Quote.findOne({ _id: quoteId, companyId });
+        const quote = await Quote.findOne({ _id: quoteId, companyId: { $in: [companyId, null] } });
         if (!quote) {
             return res.status(404).json({ message: "Quote not found", success: false });
         }

@@ -27,7 +27,7 @@ const pushEvent = (task, eventType, text, meta, byUserId) => {
 
 export const createTask = async (req, res) => {
     try {
-        const { title, description, status, priority, assignedTo, dueDate, projectId } = req.body;
+        const { title, description, status, priority, assignedTo, dueDate, projectId, links } = req.body;
 
         const project = await Project.findOne({ _id: projectId, isDeleted: false });
         if (!project) return res.status(404).json({ success: false, message: "Project not found" });
@@ -44,7 +44,7 @@ export const createTask = async (req, res) => {
         }));
 
         const task = await Task.create({
-            title, description, status, priority, dueDate,
+            title, description, status, priority, dueDate, links,
             project: projectId,
             assignedTo: assignedUsers,
             createdBy: req.user.userId,

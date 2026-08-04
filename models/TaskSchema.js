@@ -36,6 +36,7 @@ const TaskSchema = new mongoose.Schema({
     assignedTo: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     dueDate: { type: Date },
+    links: { type: String },
     linkedBundles: [{ type: mongoose.Schema.Types.ObjectId }],
     qaAssignedTo: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
     workStarted: { type: Boolean, default: false },

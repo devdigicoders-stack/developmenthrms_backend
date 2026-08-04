@@ -12,7 +12,20 @@ export const getLeads = async (req, res) => {
         const skip = (Number(page) - 1) * Number(limit);
         const lim  = Math.min(Number(limit), 100);
 
-        const filter = { companyId: cid(req) };
+        const filter = {};
+        const companyId = cid(req);
+        const isAdmin = req.user.role === "super_admin" || req.user.role === "admin";
+
+        if (isAdmin) {
+            if (req.user.role === "admin") {
+                filter.$or = [{ companyId }, { assignedTo: req.user.userId }];
+            } else {
+                filter.companyId = companyId;
+            }
+            if (assignedTo) filter.assignedTo = assignedTo;
+        } else {
+            filter.assignedTo = req.user.userId;
+        }
 
         if (search?.trim()) {
             const s = search.trim();
@@ -23,10 +36,7 @@ export const getLeads = async (req, res) => {
             }
         }
 
-        if (status)     filter.status     = status;
-        if (assignedTo) filter.assignedTo = assignedTo;
-
-        const isFiltered = !!(search?.trim() || status || assignedTo);
+        if (status) filter.status = status;
         const [leads, total] = await Promise.all([
             Lead.find(filter, {
                 contactNumber: 1, orgName: 1, contactPerson: 1,
@@ -37,9 +47,7 @@ export const getLeads = async (req, res) => {
                 .skip(skip)
                 .limit(lim)
                 .lean(),
-            isFiltered
-                ? Lead.countDocuments(filter)
-                : Lead.estimatedDocumentCount(),
+            Lead.countDocuments(filter),
         ]);
 
         res.json({ leads, total, page: Number(page), limit: lim, success: true });
@@ -51,7 +59,19 @@ export const getLeads = async (req, res) => {
 // ── GET /api/leads/:id ────────────────────────────────────────────────────────
 export const getLeadById = async (req, res) => {
     try {
-        const lead = await Lead.findOne({ _id: req.params.id, companyId: cid(req) })
+        const companyId = cid(req);
+        const isAdmin = req.user.role === "super_admin" || req.user.role === "admin";
+        const filter = { _id: req.params.id };
+
+        if (isAdmin) {
+            if (req.user.role === "admin") {
+                filter.$or = [{ companyId }, { assignedTo: req.user.userId }];
+            }
+        } else {
+            filter.assignedTo = req.user.userId;
+        }
+
+        const lead = await Lead.findOne(filter)
             .populate("assignedTo", "firstName lastName employeeCode profilePic")
             .populate("createdBy",  "firstName lastName")
             .populate("updatedBy",  "firstName lastName")
@@ -111,7 +131,7 @@ export const updateLead = async (req, res) => {
             });
         }
 
-        const current = await Lead.findOne({ _id: req.params.id, companyId: cid(req) }).lean();
+        const current = await Lead.findOne({ _id: req.params.id, companyId: { $in: [cid(req), null] } }).lean();
         if (!current) return res.status(404).json({ message: "Lead not found", success: false });
 
         const resolveUser = async (id) => {
@@ -161,12 +181,24 @@ export const updateLead = async (req, res) => {
 // ── DELETE /api/leads/:id ─────────────────────────────────────────────────────
 export const deleteLead = async (req, res) => {
     try {
-        const lead = await Lead.findOne({ _id: req.params.id, companyId: cid(req) }).lean();
+        const companyId = cid(req);
+        const isAdmin = req.user.role === "super_admin" || req.user.role === "admin";
+        const filter = { _id: req.params.id };
+
+        if (isAdmin) {
+            if (req.user.role === "admin") {
+                filter.$or = [{ companyId }, { assignedTo: req.user.userId }];
+            }
+        } else {
+            filter.assignedTo = req.user.userId;
+        }
+
+        const lead = await Lead.findOne(filter).lean();
         if (!lead) return res.status(404).json({ message: "Lead not found", success: false });
 
         const isOwner = lead.createdBy?.toString() === req.user.userId;
-        const isAdmin = ["admin", "super_admin"].includes(req.user.role);
-        if (!isOwner && !isAdmin)
+        const isAdminRole = ["admin", "super_admin"].includes(req.user.role);
+        if (!isOwner && !isAdminRole)
             return res.status(403).json({ message: "Not allowed", success: false });
 
         await Lead.deleteOne({ _id: req.params.id });
@@ -197,7 +229,7 @@ export const addCommunication = async (req, res) => {
         };
 
         const lead = await Lead.findOneAndUpdate(
-            { _id: req.params.id, companyId: cid(req) },
+            { _id: req.params.id, companyId: { $in: [cid(req), null] } },
             { $push: { communications: comm, history: histEntry } },
             { new: true }
         ).populate("communications.addedBy", "firstName lastName").lean();

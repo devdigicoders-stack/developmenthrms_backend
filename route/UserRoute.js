@@ -1,5 +1,5 @@
 import express from "express";
-import { registerUser, loginUser, forgotPassword, resetPassword, adminChangePassword, getAllUsers, getAllUsersByCompany, verifyToken, getUserProfile, updateUserProfile, adminUpdateUser, toggleUserStatus, logoutUser, changePassword } from "../controller/UserController.js";
+import { registerUser, loginUser, forgotPassword, resetPassword, adminChangePassword, getAllUsers, getAllUsersByCompany, verifyToken, getUserProfile, updateUserProfile, adminUpdateUser, toggleUserStatus, logoutUser, changePassword, deleteUser } from "../controller/UserController.js";
 import upload from "../middleware/multer.js";
 import { protect, hasPermission } from "../middleware/authMiddleware.js";
 
@@ -17,6 +17,7 @@ router.patch("/change-password", protect, changePassword);
 router.patch("/:id/change-password", protect, hasPermission("UPDATE_USER"), adminChangePassword);
 router.put("/:id", protect, adminUpdateUser);
 router.patch("/:id/toggle-status", protect, toggleUserStatus);
+router.delete("/:id", protect, hasPermission("DELETE_USER"), deleteUser);
 router.get("/all", protect, getAllUsers);
 router.get("/company/:companyId/users", protect, getAllUsersByCompany);
 router.get("/me", protect, verifyToken);
