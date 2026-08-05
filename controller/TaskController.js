@@ -1,5 +1,6 @@
 import Task from "../models/TaskSchema.js";
 import Project from "../models/ProjectSchema.js";
+import User from "../models/UserSchema.js";
 import cloudinary from "../utills/cloudinary.js";
 import { createNotification } from "../utills/notificationHelper.js";
 import { uploadManyToCloudinary } from "../middleware/multer.js";
@@ -51,6 +52,16 @@ export const createTask = async (req, res) => {
             attachments,
             assignmentHistory: initialHistory,
         });
+
+        if (assignedUsers.length > 0) {
+            await createNotification({
+                userId: assignedUsers,
+                title: "New Task Assigned",
+                message: `You have been assigned to the task "${title}" in project "${project.name}"`,
+                type: "system",
+                createdBy: req.user.userId
+            });
+        }
 
         const populated = await populateTask(Task.findById(task._id));
         res.status(201).json({ success: true, data: populated });

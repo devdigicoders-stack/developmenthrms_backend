@@ -431,3 +431,15 @@ export const deleteUser = async (req, res) => {
         res.status(500).json({ message: 'Error deleting user', success: false });
     }
 };
+
+export const saveFcmToken = async (req, res) => {
+    try {
+        const { fcmToken } = req.body;
+        if (!fcmToken) return res.status(400).json({ message: "Token is required", success: false });
+        
+        await User.findByIdAndUpdate(req.user.userId, { fcmToken });
+        res.status(200).json({ message: "Token saved successfully", success: true });
+    } catch (error) {
+        res.status(500).json({ message: "Error saving token", success: false });
+    }
+};

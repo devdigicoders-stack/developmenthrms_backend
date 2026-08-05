@@ -1,4 +1,6 @@
 import Notification from "../models/NotificationSchema.js";
+import User from "../models/UserSchema.js";
+import { sendPushNotification } from "../utills/firebaseAdmin.js";
 
 // GET /api/notifications?page=1&limit=20&unreadOnly=true
 export const getMyNotifications = async (req, res) => {
@@ -91,5 +93,52 @@ export const clearAllNotifications = async (req, res) => {
         res.status(200).json({ message: "All notifications cleared", success: true });
     } catch (err) {
         res.status(500).json({ message: "Error clearing notifications", success: false });
+    }
+};
+
+// POST /api/notifications/send
+export const sendNotification = async (req, res) => {
+    try {
+        const { userId, title, message, type, link } = req.body;
+        
+        if (!userId || !title || !message) {
+            return res.status(400).json({ message: "userId, title, and message are required", success: false });
+        }
+
+        let recipients = [];
+        if (userId === "all") {
+            const users = await User.find({ isActive: true }).select("_id");
+            recipients = users.map(u => u._id);
+        } else if (Array.isArray(userId)) {
+            recipients = userId;
+        } else {
+            recipients = [userId];
+        }
+
+        if (recipients.length === 0) {
+            return res.status(400).json({ message: "No valid recipients found", success: false });
+        }
+
+        const notifications = recipients.map(id => ({
+            userId: id,
+            title,
+            message,
+            type: type || "general",
+            link: link || null,
+            createdBy: req.user.userId,
+            isRead: false
+        }));
+
+        await Notification.insertMany(notifications);
+
+        // Fetch tokens and send push notifications asynchronously
+        const recipientUsers = await User.find({ _id: { $in: recipients }, fcmToken: { $ne: null } }).select("fcmToken");
+        recipientUsers.forEach(u => {
+            sendPushNotification(u.fcmToken, title, message, { link: link || "/" });
+        });
+
+        res.status(201).json({ message: `Notification sent to ${recipients.length} user(s)`, success: true });
+    } catch (err) {
+        res.status(500).json({ message: "Error sending notification", success: false });
     }
 };

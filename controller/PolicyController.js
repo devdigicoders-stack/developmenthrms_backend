@@ -1,4 +1,6 @@
 import Policy from "../models/PolicySchema.js";
+import User from "../models/UserSchema.js";
+import { createNotification } from "../utills/notificationHelper.js";
 
 // Admin creates or updates a policy (Privacy Policy, NDA, etc.)
 export const createOrUpdatePolicy = async (req, res) => {
@@ -16,6 +18,21 @@ export const createOrUpdatePolicy = async (req, res) => {
             policy.content = content;
             policy.updatedBy = req.user.userId;
             await policy.save();
+
+            const filter = { isActive: true };
+            if (policy.companyId) filter.companyId = policy.companyId;
+            const users = await User.find(filter).select("_id");
+            if (users.length > 0) {
+                await createNotification({
+                    userId: users.map(u => u._id),
+                    title: "Policy Updated 📜",
+                    message: `The company policy "${title}" has been updated.`,
+                    type: "company",
+                    link: "/policies",
+                    createdBy: req.user.userId
+                });
+            }
+
             return res.status(200).json({ message: "Policy updated successfully", policy, success: true });
         } else {
             policy = new Policy({
@@ -25,6 +42,21 @@ export const createOrUpdatePolicy = async (req, res) => {
                 createdBy: req.user.userId
             });
             await policy.save();
+
+            const filter = { isActive: true };
+            if (policy.companyId) filter.companyId = policy.companyId;
+            const users = await User.find(filter).select("_id");
+            if (users.length > 0) {
+                await createNotification({
+                    userId: users.map(u => u._id),
+                    title: "New Policy Published 📜",
+                    message: `A new company policy "${title}" has been published.`,
+                    type: "company",
+                    link: "/policies",
+                    createdBy: req.user.userId
+                });
+            }
+
             return res.status(201).json({ message: "Policy created successfully", policy, success: true });
         }
     } catch (error) {

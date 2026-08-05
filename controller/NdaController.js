@@ -1,5 +1,8 @@
 import Nda from "../models/NdaSchema.js";
 import NdaSignature from "../models/NdaSignatureSchema.js";
+import User from "../models/UserSchema.js";
+import Role from "../models/roleSchema.js";
+import { createNotification } from "../utills/notificationHelper.js";
 import { uploadToCloudinary, uploadBufferToCloudinary } from "../middleware/multer.js";
 import fs from 'fs';
 import path from 'path';
@@ -189,6 +192,30 @@ export const signNda = async (req, res) => {
         });
         
         await signature.save();
+
+        try {
+            const user = await User.findById(req.user.userId).select("firstName lastName companyId");
+            const roles = await Role.find({ name: { $in: ["super_admin", "admin", "hr"] } }).select("_id");
+            const roleIds = roles.map(r => r._id);
+            const filter = { role: { $in: roleIds }, isActive: true };
+            if (user?.companyId) filter.$or = [{ companyId: user.companyId }, { companyId: null }];
+            const admins = await User.find(filter).select("_id");
+            const adminIds = admins.map(a => a._id);
+            
+            if (adminIds.length > 0) {
+                await createNotification({
+                    userId: adminIds,
+                    title: "NDA Signed ✍️",
+                    message: `${user?.firstName || 'Employee'} ${user?.lastName || ''} has signed the NDA: ${nda.title}`,
+                    type: "company",
+                    link: "/nda",
+                    createdBy: req.user.userId
+                });
+            }
+        } catch (err) {
+            console.error("Failed to notify HR/Admin for NDA", err);
+        }
+
         res.status(201).json({ message: "NDA signed successfully", success: true });
     } catch (error) {
         console.error("Sign NDA Error:", error);

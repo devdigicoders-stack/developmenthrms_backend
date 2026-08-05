@@ -97,4 +97,7 @@ export const permission = {
         VIEW_LEAD: "VIEW_LEAD",
         VIEW_ALL_LEADS: "VIEW_ALL_LEADS",
     },
+    Notification: {
+        SEND_NOTIFICATION: "SEND_NOTIFICATION",
+    },
 };

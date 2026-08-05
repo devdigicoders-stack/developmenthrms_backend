@@ -1,6 +1,6 @@
 import express from "express";
-import { getMyNotifications, getUnreadCount, markAsRead, markAllAsRead, deleteNotification, clearAllNotifications, markProjectNotificationsRead } from "../controller/NotificationController.js";
-import { protect } from "../middleware/authMiddleware.js";
+import { getMyNotifications, getUnreadCount, markAsRead, markAllAsRead, deleteNotification, clearAllNotifications, markProjectNotificationsRead, sendNotification } from "../controller/NotificationController.js";
+import { protect, hasPermission } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
@@ -11,5 +11,7 @@ router.patch("/mark-project-read/:projectId", protect, markProjectNotificationsR
 router.delete("/clear-all", protect, clearAllNotifications);
 router.patch("/:id/read", protect, markAsRead);
 router.delete("/:id", protect, deleteNotification);
+
+router.post("/send", protect, hasPermission("SEND_NOTIFICATION"), sendNotification);
 
 export default router;

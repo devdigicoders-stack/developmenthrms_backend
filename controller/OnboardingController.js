@@ -1,7 +1,9 @@
 import OnboardingForm from "../models/OnboardingFormSchema.js";
 import User from "../models/UserSchema.js";
 import SalaryStructure from "../models/SalaryStructureSchema.js";
+import Role from "../models/roleSchema.js";
 import { uploadToCloudinary } from "../middleware/multer.js";
+import { createNotification } from "../utills/notificationHelper.js";
 import { sendMail } from "../utills/SendEmail.js";
 import { generateOfferPdfBuffer } from "../utills/offerPdfGenerator.js";
 import puppeteer from "puppeteer";
@@ -106,6 +108,28 @@ export const submitOnboardingForm = async (req, res) => {
             user.email = data.email;
         }
         await user.save();
+
+        try {
+            const roles = await Role.find({ name: { $in: ["super_admin", "admin", "hr"] } }).select("_id");
+            const roleIds = roles.map(r => r._id);
+            const filter = { role: { $in: roleIds }, isActive: true };
+            if (companyId) filter.$or = [{ companyId }, { companyId: null }];
+            const admins = await User.find(filter).select("_id");
+            const adminIds = admins.map(a => a._id);
+            
+            if (adminIds.length > 0) {
+                await createNotification({
+                    userId: adminIds,
+                    title: "New Onboarding Form 📝",
+                    message: `${user.firstName || 'Employee'} ${user.lastName || ''} has submitted their onboarding form.`,
+                    type: "user",
+                    link: "/onboarding",
+                    createdBy: req.user.userId
+                });
+            }
+        } catch (err) {
+            console.error("Failed to notify HR/Admin for Onboarding", err);
+        }
 
         res.status(201).json({ message: "Onboarding form submitted successfully. Please wait for Admin approval.", success: true });
     } catch (error) {

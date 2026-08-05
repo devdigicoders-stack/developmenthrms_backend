@@ -1,5 +1,5 @@
 import express from "express";
-import { registerUser, loginUser, forgotPassword, resetPassword, adminChangePassword, getAllUsers, getAllUsersByCompany, verifyToken, getUserProfile, updateUserProfile, adminUpdateUser, toggleUserStatus, logoutUser, changePassword, deleteUser } from "../controller/UserController.js";
+import { registerUser, loginUser, forgotPassword, resetPassword, adminChangePassword, getAllUsers, getAllUsersByCompany, verifyToken, getUserProfile, updateUserProfile, adminUpdateUser, toggleUserStatus, logoutUser, changePassword, deleteUser, saveFcmToken } from "../controller/UserController.js";
 import upload from "../middleware/multer.js";
 import { protect, hasPermission } from "../middleware/authMiddleware.js";
 
@@ -21,5 +21,6 @@ router.delete("/:id", protect, hasPermission("DELETE_USER"), deleteUser);
 router.get("/all", protect, getAllUsers);
 router.get("/company/:companyId/users", protect, getAllUsersByCompany);
 router.get("/me", protect, verifyToken);
+router.post("/save-fcm-token", protect, saveFcmToken);
 
 export default router;

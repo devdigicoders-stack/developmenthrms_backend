@@ -1,5 +1,6 @@
 import Holiday from "../models/HolidaySchema.js";
 import User from "../models/UserSchema.js";
+import { createNotification } from "../utills/notificationHelper.js";
 
 const getCompanyId = async (userId) => {
     const u = await User.findById(userId).select("companyId role").populate("role", "name");
@@ -38,6 +39,23 @@ export const createHoliday = async (req, res) => {
             companyId: resolvedCompany,
             createdBy: req.user.userId,
         });
+
+        // If resolvedCompany is null, notify all active users (global holiday)
+        const filter = { isActive: true };
+        if (resolvedCompany) filter.companyId = resolvedCompany;
+        
+        const users = await User.find(filter).select("_id");
+        if (users.length > 0) {
+            await createNotification({
+                userId: users.map(u => u._id),
+                title: "New Holiday Added 🎉",
+                message: `${name} has been added as a holiday on ${date}.`,
+                type: "system",
+                link: "/holidays",
+                createdBy: req.user.userId
+            });
+        }
+
         res.status(201).json({ holiday, message: "Holiday created", success: true });
     } catch (err) {
         if (err.code === 11000) return res.status(400).json({ message: "Holiday already exists on this date", success: false });
@@ -63,6 +81,22 @@ export const bulkCreateHolidays = async (req, res) => {
         }));
 
         const result = await Holiday.insertMany(docs, { ordered: false });
+
+        const filter = { isActive: true };
+        if (resolvedCompany) filter.companyId = resolvedCompany;
+        
+        const users = await User.find(filter).select("_id");
+        if (users.length > 0 && result.length > 0) {
+            await createNotification({
+                userId: users.map(u => u._id),
+                title: "New Holidays Added 🎉",
+                message: `${result.length} new holiday(s) have been added to the calendar.`,
+                type: "system",
+                link: "/holidays",
+                createdBy: req.user.userId
+            });
+        }
+
         res.status(201).json({ inserted: result.length, message: `${result.length} holidays added`, success: true });
     } catch (err) {
         // ordered:false — partial inserts possible; report what was inserted
@@ -132,6 +166,22 @@ export const csvUploadHolidays = async (req, res) => {
             inserted = bulkErr.result?.nInserted ?? bulkErr.insertedDocs?.length ?? 0;
             if (inserted === 0) return res.status(400).json({ message: "All rows failed (possibly duplicates)", errors, success: false });
         }
+
+        const filter = { isActive: true };
+        if (resolvedCompany) filter.companyId = resolvedCompany;
+        
+        const users = await User.find(filter).select("_id");
+        if (users.length > 0 && inserted > 0) {
+            await createNotification({
+                userId: users.map(u => u._id),
+                title: "New Holidays Added 🎉",
+                message: `${inserted} new holiday(s) have been added to the calendar.`,
+                type: "system",
+                link: "/holidays",
+                createdBy: req.user.userId
+            });
+        }
+
         res.status(201).json({ inserted, skipped: docs.length - inserted, errors, message: `${inserted} holiday${inserted !== 1 ? "s" : ""} imported`, success: true });
     } catch (err) {
         res.status(500).json({ message: err.message, success: false });
@@ -150,6 +200,21 @@ export const updateHoliday = async (req, res) => {
         if (type) holiday.type = type;
         holiday.updatedBy = req.user.userId;
         await holiday.save();
+
+        const filter = { isActive: true };
+        if (holiday.companyId) filter.companyId = holiday.companyId;
+        const users = await User.find(filter).select("_id");
+        if (users.length > 0) {
+            await createNotification({
+                userId: users.map(u => u._id),
+                title: "Holiday Updated 🗓️",
+                message: `The holiday "${holiday.name}" on ${holiday.date} has been updated.`,
+                type: "system",
+                link: "/holidays",
+                createdBy: req.user.userId
+            });
+        }
+
         res.status(200).json({ holiday, message: "Holiday updated", success: true });
     } catch (err) {
         res.status(500).json({ message: err.message, success: false });
@@ -159,7 +224,22 @@ export const updateHoliday = async (req, res) => {
 // DELETE /api/holidays/:id
 export const deleteHoliday = async (req, res) => {
     try {
-        await Holiday.findByIdAndDelete(req.params.id);
+        const holiday = await Holiday.findByIdAndDelete(req.params.id);
+        if (holiday) {
+            const filter = { isActive: true };
+            if (holiday.companyId) filter.companyId = holiday.companyId;
+            const users = await User.find(filter).select("_id");
+            if (users.length > 0) {
+                await createNotification({
+                    userId: users.map(u => u._id),
+                    title: "Holiday Cancelled ❌",
+                    message: `The holiday "${holiday.name}" on ${holiday.date} has been cancelled.`,
+                    type: "system",
+                    link: "/holidays",
+                    createdBy: req.user.userId
+                });
+            }
+        }
         res.status(200).json({ message: "Holiday deleted", success: true });
     } catch (err) {
         res.status(500).json({ message: err.message, success: false });

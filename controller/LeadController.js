@@ -1,5 +1,6 @@
 import Lead from "../models/LeadSchema.js";
 import LeadFieldConfig from "../models/LeadFieldConfigSchema.js";
+import { createNotification } from "../utills/notificationHelper.js";
 import { parse } from "csv-parse/sync";
 
 // companyId comes from JWT — no extra DB call needed
@@ -107,6 +108,17 @@ export const createLead = async (req, res) => {
             createdBy:     req.user.userId,
         });
 
+        if (assignedTo) {
+            await createNotification({
+                userId: assignedTo,
+                title: "New Lead Assigned 🎯",
+                message: `You have been assigned a new lead: ${orgName.trim()}`,
+                type: "system",
+                link: "/leads",
+                createdBy: req.user.userId
+            });
+        }
+
         res.status(201).json({ lead, message: "Lead created", success: true });
     } catch (err) {
         if (err.code === 11000)
@@ -169,6 +181,17 @@ export const updateLead = async (req, res) => {
             .populate("history.changedBy", "firstName lastName")
             .populate("communications.addedBy", "firstName lastName")
             .lean();
+
+        if ($set.assignedTo && $set.assignedTo !== current.assignedTo?.toString()) {
+            await createNotification({
+                userId: $set.assignedTo,
+                title: "Lead Assigned 🎯",
+                message: `You have been assigned the lead: ${current.orgName}`,
+                type: "system",
+                link: "/leads",
+                createdBy: req.user.userId
+            });
+        }
 
         res.json({ lead, message: "Lead updated", success: true });
     } catch (err) {

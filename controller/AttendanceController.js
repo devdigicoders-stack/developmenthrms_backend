@@ -1,7 +1,25 @@
 import Attendance from "../models/AttendanceSchema.js";
 import User from "../models/UserSchema.js";
 import WorkShift from "../models/workShiftSchema.js";
+import Role from "../models/roleSchema.js";
 import { createNotification } from "../utills/notificationHelper.js";
+
+const notifyAdmins = async (companyId, title, message) => {
+    try {
+        const roles = await Role.find({ name: { $in: ["super_admin", "admin"] } }).select("_id");
+        const roleIds = roles.map(r => r._id);
+        const filter = { role: { $in: roleIds }, isActive: true };
+        if (companyId) filter.$or = [{ companyId }, { companyId: null }];
+        const admins = await User.find(filter).select("_id");
+        const adminIds = admins.map(a => a._id);
+        
+        if (adminIds.length > 0) {
+            await createNotification({ userId: adminIds, title, message, type: "attendance", link: "/attendance" });
+        }
+    } catch (e) {
+        console.error("Admin notification failed", e);
+    }
+};
 
 // #5 — Always return today's date in IST (UTC+5:30)
 const todayDate = () => {
@@ -75,6 +93,7 @@ export const checkIn = async (req, res) => {
 
             const checkInTime = now.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
             await createNotification({ userId, title: "Check-In Recorded", message: `Re-checked in at ${checkInTime}.`, type: "attendance", link: "/attendance", createdBy: userId });
+            await notifyAdmins(user.companyId, "User Checked In", `${populated.createdBy.firstName} ${populated.createdBy.lastName} re-checked in at ${checkInTime}.`);
             return res.status(200).json({ message: "Re-checked in successfully", attendance: populated, success: true });
         }
 
@@ -97,6 +116,7 @@ export const checkIn = async (req, res) => {
 
         const checkInTime = now.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
         await createNotification({ userId, title: "Check-In Recorded", message: `You checked in at ${checkInTime}. Status: ${status}.`, type: "attendance", link: "/attendance", createdBy: userId });
+        await notifyAdmins(user.companyId, "User Checked In", `${populated.createdBy.firstName} ${populated.createdBy.lastName} checked in at ${checkInTime}. Status: ${status}.`);
 
         res.status(201).json({ message: "Checked in successfully", attendance: populated, success: true });
     } catch (error) {
@@ -151,6 +171,7 @@ export const checkOut = async (req, res) => {
 
         const checkOutTime = now.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
         await createNotification({ userId, title: "Check-Out Recorded", message: `You checked out at ${checkOutTime}. Total hours: ${totalWorkHours}h. Status: ${status}.`, type: "attendance", link: "/attendance", createdBy: userId });
+        await notifyAdmins(populated.companyId, "User Checked Out", `${populated.createdBy.firstName} ${populated.createdBy.lastName} checked out at ${checkOutTime}. Total hours: ${totalWorkHours}h.`);
 
         res.status(200).json({ message: "Checked out successfully", attendance: populated, success: true });
     } catch (error) {

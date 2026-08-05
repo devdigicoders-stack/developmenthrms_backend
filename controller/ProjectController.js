@@ -1,5 +1,6 @@
 import Project from "../models/ProjectSchema.js";
 import Task from "../models/TaskSchema.js";
+import { createNotification } from "../utills/notificationHelper.js";
 import cloudinary from "../utills/cloudinary.js";
 import { uploadManyToCloudinary } from "../middleware/multer.js";
 
@@ -46,6 +47,17 @@ export const createProject = async (req, res) => {
             clientIds: clientIds || [],
             createdBy: req.user.userId,
         });
+
+        if (members && members.length > 0) {
+            await createNotification({
+                userId: members,
+                title: "New Project Assigned",
+                message: `You have been added to the project "${name}"`,
+                type: "system",
+                createdBy: req.user.userId
+            });
+        }
+
         res.status(201).json({ success: true, data: project });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
@@ -100,9 +112,25 @@ export const getProjectById = async (req, res) => {
 
 export const updateProject = async (req, res) => {
     try {
+        const existing = await Project.findById(req.params.id);
         const project = await Project.findByIdAndUpdate(
-            req.params.id, { ...req.body, updatedBy: req.user.userId }, { new: true }
+            req.params.id, { ...req.body, updatedBy: req.user.userId }, { returnDocument: 'after' }
         );
+        
+        const oldMembers = existing ? existing.members.map(m => m.toString()) : [];
+        const currentMembers = project.members || [];
+        const newMembers = currentMembers.filter(m => !oldMembers.includes(m.toString()));
+        
+        if (newMembers.length > 0) {
+            await createNotification({
+                userId: newMembers,
+                title: "Project Assigned",
+                message: `You have been added to the project "${project.name}"`,
+                type: "system",
+                createdBy: req.user.userId
+            });
+        }
+
         res.json({ success: true, data: project });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
