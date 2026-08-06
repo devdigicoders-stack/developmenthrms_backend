@@ -3,7 +3,7 @@ import User from "../models/UserSchema.js";
 import WorkShift from "../models/workShiftSchema.js";
 import Role from "../models/roleSchema.js";
 import { createNotification } from "../utills/notificationHelper.js";
-
+// hhhhh
 const notifyAdmins = async (companyId, title, message) => {
     try {
         const roles = await Role.find({ name: { $in: ["super_admin", "admin"] } }).select("_id");
