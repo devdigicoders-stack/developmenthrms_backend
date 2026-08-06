@@ -29,6 +29,7 @@ import PolicyRoute from './route/PolicyRoute.js'
 import NdaRoute from './route/NdaRoute.js'
 import OnboardingRoute from './route/OnboardingRoute.js'
 import ComplaintRoute from './route/ComplaintRoute.js'
+import TicketRoute from './route/TicketRoute.js'
 import PaymentRoute from './route/PaymentRoute.js'
 
 import EnvData from './config/EnvData.js'
@@ -77,6 +78,7 @@ app.use('/api/policies', PolicyRoute);
 app.use('/api/nda', NdaRoute);
 app.use('/api/onboarding', OnboardingRoute);
 app.use('/api/complaints', ComplaintRoute);
+app.use('/api/tickets', TicketRoute);
 app.use('/api/payments', PaymentRoute);
 
 app.get('/', (req, res) => {

@@ -82,6 +82,7 @@ export const permission = {
         DELETE_PROJECT: "DELETE_PROJECT",
         VIEW_PROJECT: "VIEW_PROJECT",
         VIEW_ALL_PROJECTS: "VIEW_ALL_PROJECTS",
+        UPLOAD_PROJECT_FILE: "UPLOAD_PROJECT_FILE",
     },
     Task: {
         CREATE_TASK: "CREATE_TASK",
@@ -120,5 +121,10 @@ export const permission = {
     },
     Report: {
         VIEW_REPORT: "VIEW_REPORT",
+    },
+    Ticket: {
+        RAISE_TICKET: "RAISE_TICKET",
+        VIEW_TICKET: "VIEW_TICKET",
+        MANAGE_TICKET: "MANAGE_TICKET",
     }
 };

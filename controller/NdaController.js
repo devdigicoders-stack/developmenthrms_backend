@@ -347,9 +347,10 @@ export const signClientNda = async (req, res) => {
         user.clientNdaStatus = "signed";
         await user.save();
 
-        // Save a dummy signature record to keep track of document URL
+        // Save a signature record to keep track of document URL
         const signature = new NdaSignature({
             userId: req.user.userId,
+            ndaId: clientNda ? clientNda._id : undefined,
             signatureBase64,
             signedDocumentUrl
         });
@@ -389,8 +390,18 @@ export const signClientNda = async (req, res) => {
 // Admin gets all client NDA signatures
 export const getClientNdaSignatures = async (req, res) => {
     try {
-        const signatures = await NdaSignature.find({ ndaId: { $exists: false } })
+        const clientNdas = await Nda.find({ targetAudience: 'Client' }).select('_id');
+        const clientNdaIds = clientNdas.map(nda => nda._id);
+
+        const signatures = await NdaSignature.find({
+            $or: [
+                { ndaId: { $exists: false } },
+                { ndaId: null },
+                { ndaId: { $in: clientNdaIds } }
+            ]
+        })
             .populate('userId', 'firstName lastName email profilePic clientNdaStatus')
+            .populate('ndaId', 'title')
             .sort({ createdAt: -1 });
             
         res.status(200).json({ signatures, success: true });

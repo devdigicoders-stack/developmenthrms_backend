@@ -2,6 +2,7 @@ import Payment from "../models/PaymentSchema.js";
 import SystemSettings from "../models/SystemSettingsSchema.js";
 import User from "../models/UserSchema.js";
 import { uploadToCloudinary } from "../middleware/multer.js";
+import { createNotification } from "../utills/notificationHelper.js";
 
 // Update global UPI details
 export const updateUpiDetails = async (req, res) => {
@@ -72,6 +73,29 @@ export const submitPayment = async (req, res) => {
         });
 
         await payment.save();
+
+        // Notify admins about the new payment
+        try {
+            const admins = await User.find({ "role": { $exists: true } }).populate("role");
+            const notifyAdminIds = admins
+                .filter(u => u.role?.name === "super_admin" || (u.role?.permissions || []).includes("MANAGE_PAYMENTS"))
+                .filter(u => !u.companyId || u.companyId.toString() === companyId?.toString())
+                .map(u => u._id);
+
+            if (notifyAdminIds.length > 0) {
+                const userObj = await User.findById(userId).select("firstName lastName");
+                await createNotification({
+                    userId: notifyAdminIds,
+                    title: "New Payment Uploaded",
+                    message: `${userObj?.firstName || "A client"} uploaded a new payment of ₹${amount}.`,
+                    type: "system",
+                    createdBy: userId
+                });
+            }
+        } catch (notifErr) {
+            console.error("Notification error in submitPayment:", notifErr);
+        }
+
         res.status(201).json({ message: "Payment submitted successfully", success: true, payment });
     } catch (error) {
         console.error("Error submitting payment:", error);
@@ -153,6 +177,20 @@ export const updatePaymentStatus = async (req, res) => {
         payment.reviewedAt = new Date();
 
         await payment.save();
+
+        // Notify user about payment status
+        try {
+            await createNotification({
+                userId: payment.userId,
+                title: `Payment ${status.charAt(0).toUpperCase() + status.slice(1)}`,
+                message: `Your payment of ₹${payment.amount} has been ${status}.`,
+                type: "system",
+                createdBy: reviewedBy
+            });
+        } catch (notifErr) {
+            console.error("Notification error in updatePaymentStatus:", notifErr);
+        }
+
         res.status(200).json({ message: `Payment ${status} successfully`, success: true, payment });
     } catch (error) {
         console.error("Error updating payment status:", error);

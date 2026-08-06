@@ -178,6 +178,15 @@ export const createFileBundle = async (req, res) => {
         const project = await Project.findOne({ _id: req.params.id, isDeleted: false });
         if (!project) return res.status(404).json({ success: false, message: "Project not found" });
 
+        const isSuperAdmin = req.user.role === "super_admin";
+        const hasProjectManagePermission = (req.user.permissions || []).some(p => ["CREATE_PROJECT", "UPDATE_PROJECT"].includes(p));
+        const isProjectCreator = project.createdBy?.toString() === req.user.userId || project.createdBy?._id?.toString() === req.user.userId;
+        const hasUploadPermission = (req.user.permissions || []).includes("UPLOAD_PROJECT_FILE");
+
+        if (!isSuperAdmin && !hasProjectManagePermission && !isProjectCreator && !hasUploadPermission) {
+            return res.status(403).json({ success: false, message: "You do not have permission to upload files to this project." });
+        }
+
         const pub = isPublic === "false" || isPublic === false ? false : true;
         const shared = sharedWith
             ? (Array.isArray(sharedWith) ? sharedWith : JSON.parse(sharedWith)).map(s =>
