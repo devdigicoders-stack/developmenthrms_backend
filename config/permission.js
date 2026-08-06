@@ -100,4 +100,25 @@ export const permission = {
     Notification: {
         SEND_NOTIFICATION: "SEND_NOTIFICATION",
     },
+    Complaint: {
+        CREATE_COMPLAINT: "CREATE_COMPLAINT",
+        VIEW_COMPLAINT: "VIEW_COMPLAINT",
+        VIEW_ALL_COMPLAINTS: "VIEW_ALL_COMPLAINTS",
+        MANAGE_COMPLAINT: "MANAGE_COMPLAINT",
+    },
+    Policy: {
+        MANAGE_POLICY: "MANAGE_POLICY",
+        VIEW_POLICY: "VIEW_POLICY",
+    },
+    NDA: {
+        MANAGE_NDA: "MANAGE_NDA",
+        VIEW_NDA: "VIEW_NDA",
+    },
+    Payment: {
+        MANAGE_PAYMENTS: "MANAGE_PAYMENTS",
+        SUBMIT_PAYMENT: "SUBMIT_PAYMENT",
+    },
+    Report: {
+        VIEW_REPORT: "VIEW_REPORT",
+    }
 };

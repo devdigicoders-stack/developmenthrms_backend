@@ -47,12 +47,20 @@ export const createOrUpdateNda = async (req, res) => {
             nda = await Nda.findById(documentId);
         }
 
+        // If this is a Client NDA, disable all other Client NDAs
+        if (targetAudience === 'Client') {
+            await Nda.updateMany({ targetAudience: 'Client' }, { $set: { status: false } });
+        }
+
         if (nda) {
             nda.title = title;
             if (targetAudience) nda.targetAudience = targetAudience;
             if (req.file) {
                 nda.document = { url: documentUrl };
             }
+            // Ensure this one is active
+            if (targetAudience === 'Client') nda.status = true;
+            
             nda.updatedBy = req.user.userId;
             await nda.save();
             return res.status(200).json({ message: "NDA updated successfully", nda, success: true });
@@ -238,7 +246,7 @@ export const getNdaSignatures = async (req, res) => {
 // Get NDAs signed by current user
 export const getMySignatures = async (req, res) => {
     try {
-        const signatures = await NdaSignature.find({ userId: req.user.userId }).select('ndaId signedAt');
+        const signatures = await NdaSignature.find({ userId: req.user.userId }).populate('ndaId', 'title document targetAudience');
         res.status(200).json({ signatures, success: true });
     } catch (error) {
         console.error("Get My Signatures Error:", error);
@@ -260,5 +268,149 @@ export const deleteNda = async (req, res) => {
     } catch (error) {
         console.error("Delete NDA Error:", error);
         res.status(500).json({ message: "Error deleting NDA", success: false });
+    }
+};
+
+// Client skips NDA
+export const skipClientNda = async (req, res) => {
+    try {
+        const user = await User.findById(req.user.userId);
+        if (!user) return res.status(404).json({ message: "User not found", success: false });
+        
+        user.clientNdaStatus = "skipped";
+        await user.save();
+        
+        res.json({ message: "NDA skipped successfully", success: true });
+    } catch (error) {
+        console.error("Skip Client NDA Error:", error);
+        res.status(500).json({ message: "Error skipping NDA", success: false });
+    }
+};
+
+// Client signs NDA
+export const signClientNda = async (req, res) => {
+    try {
+        const { signatureBase64 } = req.body;
+        if (!signatureBase64) return res.status(400).json({ message: "Signature is required", success: false });
+
+        const user = await User.findById(req.user.userId);
+        if (!user) return res.status(404).json({ message: "User not found", success: false });
+        
+        if (user.clientNdaStatus === "signed") {
+            return res.status(400).json({ message: "NDA already signed", success: false });
+        }
+
+        // Find active Client NDA template
+        const clientNda = await Nda.findOne({ targetAudience: 'Client', status: true });
+        
+        let signedDocumentUrl = "";
+
+        if (clientNda && clientNda.document && clientNda.document.url) {
+            try {
+                // Fetch the PDF from URL (works for local uploads and cloudinary)
+                const pdfResponse = await axios.get(clientNda.document.url, { responseType: 'arraybuffer' });
+                const docBytes = pdfResponse.data;
+                
+                const pdfDoc = await PDFDocument.load(docBytes);
+                const signatureImageBytes = Buffer.from(signatureBase64.split(',')[1], 'base64');
+                const signatureImage = await pdfDoc.embedPng(signatureImageBytes);
+                
+                const pages = pdfDoc.getPages();
+                const sigDims = signatureImage.scale(0.3);
+                
+                pages.forEach((page) => {
+                    const { width } = page.getSize();
+                    page.drawImage(signatureImage, {
+                        x: width - sigDims.width - 50, // Right side with 50px padding
+                        y: 50,
+                        width: sigDims.width,
+                        height: sigDims.height,
+                    });
+                });
+                
+                const modifiedPdfBytes = await pdfDoc.save();
+                const modifiedPdfBuffer = Buffer.from(modifiedPdfBytes);
+                
+                const signedDir = path.join(__dirname, '../uploads/ndas/signed');
+                if (!fs.existsSync(signedDir)) fs.mkdirSync(signedDir, { recursive: true });
+                
+                const filename = `client_signed_nda_${req.user.userId}_${Date.now()}.pdf`;
+                const filePath = path.join(signedDir, filename);
+                fs.writeFileSync(filePath, modifiedPdfBuffer);
+                
+                signedDocumentUrl = `${req.protocol}://${req.get('host')}/uploads/ndas/signed/${filename}`;
+            } catch (pdfErr) {
+                console.error("PDF Stamping Error:", pdfErr);
+            }
+        }
+
+        user.clientNdaStatus = "signed";
+        await user.save();
+
+        // Save a dummy signature record to keep track of document URL
+        const signature = new NdaSignature({
+            userId: req.user.userId,
+            signatureBase64,
+            signedDocumentUrl
+        });
+        await signature.save();
+
+        // Notify Super Admin
+        try {
+            const roles = await Role.find({ name: { $in: ["super_admin", "admin"] } }).select("_id");
+            const roleIds = roles.map(r => r._id);
+            const filter = { role: { $in: roleIds }, isActive: true };
+            if (user.companyId) filter.$or = [{ companyId: user.companyId }, { companyId: null }];
+            const admins = await User.find(filter).select("_id");
+            const adminIds = admins.map(a => a._id);
+            
+            if (adminIds.length > 0) {
+                await createNotification({
+                    userId: adminIds,
+                    title: "Client NDA Signed ✍️",
+                    message: `Client ${user.firstName || ''} ${user.lastName || ''} has signed their NDA.`,
+                    type: "company",
+                    link: "/nda",
+                    createdBy: req.user.userId
+                });
+            }
+        } catch (err) {
+            console.error("Failed to notify Admin for Client NDA", err);
+        }
+
+        res.json({ message: "Client NDA signed successfully", signedDocumentUrl, success: true });
+    } catch (error) {
+        console.error("Sign Client NDA Error:", error);
+        res.status(500).json({ message: error.message || "Error signing Client NDA", success: false });
+    }
+};
+
+// Admin gets all client NDA signatures
+export const getClientNdaSignatures = async (req, res) => {
+    try {
+        const signatures = await NdaSignature.find({ ndaId: { $exists: false } })
+            .populate('userId', 'firstName lastName email profilePic clientNdaStatus')
+            .sort({ createdAt: -1 });
+            
+        res.status(200).json({ signatures, success: true });
+    } catch (error) {
+        console.error("Get Client Signatures Error:", error);
+        res.status(500).json({ message: "Error fetching client signatures", success: false });
+    }
+};
+
+// Get active Client NDA template for client login
+export const getClientNdaTemplate = async (req, res) => {
+    try {
+        const clientNda = await Nda.findOne({ targetAudience: 'Client', status: true });
+        
+        if (!clientNda) {
+            return res.status(200).json({ nda: null, message: "No active Client NDA found", success: true });
+        }
+        
+        res.status(200).json({ nda: clientNda, success: true });
+    } catch (error) {
+        console.error("Get Client NDA Template Error:", error);
+        res.status(500).json({ message: "Error fetching Client NDA template", success: false });
     }
 };

@@ -7,7 +7,7 @@ const ndaSchema = new mongoose.Schema({
     publicId: { type: String }
   },
   companyId: { type: mongoose.Schema.Types.ObjectId, ref: "Company", default: null }, // Null means global NDA
-  targetAudience: { type: String, enum: ["Employee", "Intern", "Both"], default: "Both" },
+  targetAudience: { type: String, enum: ["Employee", "Intern", "Both", "Client"], default: "Both" },
   status: { type: Boolean, default: true },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" }

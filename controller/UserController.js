@@ -64,6 +64,11 @@ export const registerUser = async (req, res) => {
             createdBy: req.user?.userId || null
         });
         
+        if (req.file) {
+            const finalProposal = await uploadToCloudinary(req.file, "digicoders/hrmsv2/proposals");
+            user.finalProposal = { url: finalProposal.url, publicId: finalProposal.publicId };
+        }
+        
         await user.save();
         
         // Send welcome email asynchronously (don't block response)
@@ -317,6 +322,15 @@ export const adminUpdateUser = async (req, res) => {
         if (reportingTo !== undefined) user.reportingTo = reportingTo || null;
         if (joiningDate) user.joiningDate = normalizeDate(joiningDate);
         if (dateOfBirth) user.dateOfBirth = normalizeDate(dateOfBirth);
+        
+        if (req.file) {
+            const finalProposal = await uploadToCloudinary(req.file, "digicoders/hrmsv2/proposals");
+            if (user.finalProposal?.publicId) {
+                await cloudinary.uploader.destroy(user.finalProposal.publicId, { resource_type: "raw" }).catch(() => {});
+            }
+            user.finalProposal = { url: finalProposal.url, publicId: finalProposal.publicId };
+        }
+
         user.updatedBy = req.user.userId;
         await user.save();
         res.status(200).json({ message: "User updated successfully", success: true });

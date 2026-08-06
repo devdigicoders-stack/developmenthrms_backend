@@ -40,6 +40,11 @@ export const sendPushNotification = async (fcmToken, title, body, data = {}) => 
             title,
             body
         },
+        webpush: {
+            notification: {
+                icon: '/logo1.png'
+            }
+        },
         data: {
             ...data,
         },

@@ -102,6 +102,14 @@ const UserSchema = new mongoose.Schema({
         url: {
         }
     },
+    finalProposal: {
+        publicId: {
+            type: String,
+        },
+        url: {
+            type: String,
+        }
+    },
     otp: {
         type: String,
     },
@@ -112,6 +120,11 @@ const UserSchema = new mongoose.Schema({
         type: String,
         enum: ["pending_form", "pending_approval", "approved", "rejected"],
         default: "pending_form"
+    },
+    clientNdaStatus: {
+        type: String,
+        enum: ["pending", "skipped", "signed"],
+        default: "pending"
     },
     isActive: {
         type: Boolean,

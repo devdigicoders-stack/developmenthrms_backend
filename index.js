@@ -28,6 +28,8 @@ import { startScheduler } from './utills/scheduler.js'
 import PolicyRoute from './route/PolicyRoute.js'
 import NdaRoute from './route/NdaRoute.js'
 import OnboardingRoute from './route/OnboardingRoute.js'
+import ComplaintRoute from './route/ComplaintRoute.js'
+import PaymentRoute from './route/PaymentRoute.js'
 
 import EnvData from './config/EnvData.js'
 const app = express();
@@ -74,6 +76,8 @@ app.use('/api/quote-profiles', QuoteProfileRoute);
 app.use('/api/policies', PolicyRoute);
 app.use('/api/nda', NdaRoute);
 app.use('/api/onboarding', OnboardingRoute);
+app.use('/api/complaints', ComplaintRoute);
+app.use('/api/payments', PaymentRoute);
 
 app.get('/', (req, res) => {
     res.send("API is running")

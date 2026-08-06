@@ -1,20 +1,19 @@
 import express from "express";
 import { createOrUpdatePolicy, getPolicyByTitle, getAllPolicies, deletePolicy } from "../controller/PolicyController.js";
-import { protect, authorize } from "../middleware/authMiddleware.js";
-
+import { protect, hasPermission } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-// Get specific policy (Users can access this, or even public if needed. We'll make it protected but accessible by any role)
-router.get("/title/:title", protect, getPolicyByTitle);
+// Get specific policy
+router.get("/title/:title", protect, hasPermission("VIEW_POLICY"), getPolicyByTitle);
 
 // Get all policies
-router.get("/", protect, getAllPolicies);
+router.get("/", protect, hasPermission("VIEW_POLICY"), getAllPolicies);
 
-// Create or update policy (Admin only, or based on permission)
-router.post("/", protect, authorize("super_admin"), createOrUpdatePolicy);
+// Create or update policy
+router.post("/", protect, hasPermission("MANAGE_POLICY"), createOrUpdatePolicy);
 
-// Delete policy (Admin only)
-router.delete("/:id", protect, authorize("super_admin"), deletePolicy);
+// Delete policy
+router.delete("/:id", protect, hasPermission("MANAGE_POLICY"), deletePolicy);
 
 export default router;

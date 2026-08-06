@@ -6,7 +6,7 @@ import { protect, hasPermission } from "../middleware/authMiddleware.js";
 const router = express.Router();
 
 router.post("/signup", registerUser);
-router.post("/create", protect, registerUser);
+router.post("/create", protect, upload.single("finalProposal"), registerUser);
 router.post("/login", loginUser);
 router.post("/forgot-password", forgotPassword);
 router.post("/reset-password", resetPassword);
@@ -15,7 +15,7 @@ router.get("/profile", protect, getUserProfile);
 router.put("/profile", protect, upload.single("profilePic"), updateUserProfile);
 router.patch("/change-password", protect, changePassword);
 router.patch("/:id/change-password", protect, hasPermission("UPDATE_USER"), adminChangePassword);
-router.put("/:id", protect, adminUpdateUser);
+router.put("/:id", protect, upload.single("finalProposal"), adminUpdateUser);
 router.patch("/:id/toggle-status", protect, toggleUserStatus);
 router.delete("/:id", protect, hasPermission("DELETE_USER"), deleteUser);
 router.get("/all", protect, getAllUsers);
