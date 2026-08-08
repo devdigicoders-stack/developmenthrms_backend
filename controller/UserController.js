@@ -238,6 +238,7 @@ export const getAllUsers = async (req, res) => {
         if (currentUser?.role?.name === "super_admin") {
             const users = await User.find().select("-password -otp")
                 .populate("role", "name").populate("companyId", "name")
+                .populate("department", "name")
                 .populate("workShift", "name startTime endTime")
                 .populate("employmentStatus", "name")
                 .populate("reportingTo", "firstName lastName employeeCode profilePic")
@@ -247,6 +248,7 @@ export const getAllUsers = async (req, res) => {
         }
         const users = await User.find({ companyId: currentUser.companyId }).select("-password -otp")
             .populate("role", "name").populate("companyId", "name")
+            .populate("department", "name")
             .populate("workShift", "name startTime endTime")
             .populate("employmentStatus", "name")
             .populate("reportingTo", "firstName lastName employeeCode profilePic")

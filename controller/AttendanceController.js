@@ -297,13 +297,19 @@ export const adminCreatePunch = async (req, res) => {
 // GET /api/attendance/team  — manager sees their direct reports' attendance
 export const getTeamAttendance = async (req, res) => {
     try {
-        const { date, month } = req.query;
+        const { date, month, startDate, endDate } = req.query;
         const directReports = await User.find({ reportingTo: req.user.userId, isDeleted: false }).select("_id");
         if (!directReports.length) return res.status(200).json({ records: [], success: true });
 
         const filter = { userId: { $in: directReports.map(u => u._id) } };
-        if (date) filter.date = date;
-        else if (month) filter.date = { $regex: `^${month}` };
+        
+        if (startDate && endDate) {
+            filter.date = { $gte: startDate, $lte: endDate };
+        } else if (date) {
+            filter.date = date;
+        } else if (month) {
+            filter.date = { $regex: `^${month}` };
+        }
 
         const records = await Attendance.find(filter)
             .populate("userId", "firstName lastName email employeeCode profilePic")
@@ -318,14 +324,21 @@ export const getTeamAttendance = async (req, res) => {
 
 export const getCompanyAttendance = async (req, res) => {
     try {
-        const { date, month, userId } = req.query;
+        const { date, month, userId, startDate, endDate } = req.query;
         const reqUser = await User.findById(req.user.userId).select("companyId role").populate("role", "name");
         if (!reqUser) return res.status(404).json({ message: "User not found", success: false });
 
         const filter = {};
         if (reqUser.role?.name !== "super_admin") filter.companyId = reqUser.companyId;
-        if (date) filter.date = date;
-        else if (month) filter.date = { $regex: `^${month}` };
+        
+        if (startDate && endDate) {
+            filter.date = { $gte: startDate, $lte: endDate };
+        } else if (date) {
+            filter.date = date;
+        } else if (month) {
+            filter.date = { $regex: `^${month}` };
+        }
+        
         if (userId) filter.userId = userId;
 
         const records = await Attendance.find(filter)

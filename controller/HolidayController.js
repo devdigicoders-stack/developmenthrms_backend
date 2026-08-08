@@ -13,7 +13,15 @@ export const getHolidays = async (req, res) => {
         const { year, companyId: qCompany } = req.query;
         const { companyId, isSuperAdmin } = await getCompanyId(req.user.userId);
         const filter = {};
-        filter.companyId = isSuperAdmin && qCompany ? qCompany : companyId;
+        if (isSuperAdmin) {
+            if (qCompany) filter.companyId = qCompany;
+        } else {
+            filter.$or = [
+                { companyId: companyId },
+                { companyId: null },
+                { companyId: { $exists: false } }
+            ];
+        }
         if (year) filter.date = { $regex: `^${year}` };
 
         const holidays = await Holiday.find(filter)

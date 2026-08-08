@@ -32,6 +32,12 @@ export const generatePayroll = async (req, res) => {
         const { month, userId: targetUserId } = req.body;
         if (!month) return res.status(400).json({ message: "month is required (YYYY-MM)", success: false });
 
+        // Prevent generating payroll for future months
+        const currentMonth = new Date().toISOString().slice(0, 7); // Gets "YYYY-MM" format
+        if (month > currentMonth) {
+            return res.status(400).json({ message: "Cannot generate payroll for future months. Please select a valid past or current month.", success: false });
+        }
+
         const reqUser = await User.findById(req.user.userId).select("companyId role").populate("role", "name");
         
         // Fetch employees to process
@@ -97,11 +103,9 @@ export const generatePayroll = async (req, res) => {
                     if (l.leaveTypeId?.isPaid) paidLeaveDays += l.days;
                 });
 
-                // Auto-calculate absent days from working days if no attendance records
-                const attendedDays = presentDays + halfDays * 0.5;
-                const calculatedAbsent = absentDays === 0 && presentDays === 0
-                    ? Math.max(0, totalWorkingDays - paidLeaveDays)
-                    : absentDays;
+                // Calculate Absent Days consistently so that (Present + Half + Absent) does not exceed Working Days
+                let calculatedAbsent = totalWorkingDays - presentDays - halfDays;
+                if (calculatedAbsent < 0) calculatedAbsent = 0; // In case of overtime on weekends
 
                 // LOP = absent days not covered by paid leave
                 const effectivePaidLeave = Math.min(paidLeaveDays, calculatedAbsent);
@@ -111,6 +115,9 @@ export const generatePayroll = async (req, res) => {
                 if (lopDays > totalWorkingDays) {
                     lopDays = totalWorkingDays;
                 }
+                
+                // Override the raw absentDays for saving into the DB so the payslip looks consistent
+                absentDays = calculatedAbsent;
 
                 // Compute salary components
                 const grossForCalc = structure.grossEarnings > 0 ? structure.grossEarnings : structure.basic;
@@ -206,7 +213,8 @@ export const getPayrollRuns = async (req, res) => {
 export const getMyPayslips = async (req, res) => {
     try {
         const { month } = req.query;
-        const filter = { userId: req.user.userId };
+        // Employees should only see approved or paid payslips (not drafts)
+        const filter = { userId: req.user.userId, status: { $in: ["approved", "paid"] } };
         if (month) filter.month = month;
 
         const runs = await PayrollRun.find(filter)
@@ -334,8 +342,12 @@ export const getPayrollSummary = async (req, res) => {
         const { month } = req.query;
         if (!month) return res.status(400).json({ message: "month is required", success: false });
 
-        const reqUser = await User.findById(req.user.userId).select("companyId");
-        const runs = await PayrollRun.find({ companyId: reqUser.companyId, month }).lean();
+        const reqUser = await User.findById(req.user.userId).select("companyId role").populate("role", "name");
+        const filter = { month };
+        if (reqUser.role?.name !== "super_admin") {
+            filter.companyId = reqUser.companyId;
+        }
+        const runs = await PayrollRun.find(filter).lean();
 
         const summary = {
             total: runs.length,

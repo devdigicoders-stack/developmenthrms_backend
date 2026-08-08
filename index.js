@@ -25,6 +25,7 @@ import QuoteRoute from './route/QuoteRoute.js'
 import QuoteProfileRoute from './route/QuoteProfileRoute.js'
 import cookieParser from 'cookie-parser'
 import { startScheduler } from './utills/scheduler.js'
+import startAttendanceCron from './cron/attendanceCron.js'
 import PolicyRoute from './route/PolicyRoute.js'
 import NdaRoute from './route/NdaRoute.js'
 import OnboardingRoute from './route/OnboardingRoute.js'
@@ -97,6 +98,7 @@ app.use('/api/health', (req, res) => {
 const server = app.listen(EnvData.PORT, () => {
     connectdb()
     startScheduler()
+    startAttendanceCron()
     console.log(`Server is running on port ${EnvData.PORT}`)
 })
 
