@@ -26,12 +26,15 @@ import QuoteProfileRoute from './route/QuoteProfileRoute.js'
 import cookieParser from 'cookie-parser'
 import { startScheduler } from './utills/scheduler.js'
 import startAttendanceCron from './cron/attendanceCron.js'
+import startWishesCron from './cron/wishesCron.js'
 import PolicyRoute from './route/PolicyRoute.js'
 import NdaRoute from './route/NdaRoute.js'
 import OnboardingRoute from './route/OnboardingRoute.js'
 import ComplaintRoute from './route/ComplaintRoute.js'
 import TicketRoute from './route/TicketRoute.js'
 import PaymentRoute from './route/PaymentRoute.js'
+import AssetRoute from './route/AssetRoute.js'
+import ResignationRoute from './route/ResignationRoute.js'
 
 import EnvData from './config/EnvData.js'
 const app = express();
@@ -81,6 +84,8 @@ app.use('/api/onboarding', OnboardingRoute);
 app.use('/api/complaints', ComplaintRoute);
 app.use('/api/tickets', TicketRoute);
 app.use('/api/payments', PaymentRoute);
+app.use('/api/assets', AssetRoute);
+app.use('/api/resignations', ResignationRoute);
 
 app.get('/', (req, res) => {
     res.send("API is running")
@@ -99,6 +104,7 @@ const server = app.listen(EnvData.PORT, () => {
     connectdb()
     startScheduler()
     startAttendanceCron()
+    startWishesCron()
     console.log(`Server is running on port ${EnvData.PORT}`)
 })
 

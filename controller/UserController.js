@@ -459,3 +459,73 @@ export const saveFcmToken = async (req, res) => {
         res.status(500).json({ message: "Error saving token", success: false });
     }
 };
+
+export const getUpcomingEvents = async (req, res) => {
+    try {
+        const currentUser = await User.findById(req.user.userId).populate("role");
+        const companyId = currentUser.role?.name === "super_admin" ? null : currentUser.companyId;
+
+        const query = { isActive: true };
+        if (companyId) query.companyId = companyId;
+
+        const users = await User.find(query).select("firstName lastName profilePic dateOfBirth joiningDate");
+
+        const today = new Date();
+        const todayNoTime = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+        const thirtyDaysFromNow = new Date(todayNoTime);
+        thirtyDaysFromNow.setDate(todayNoTime.getDate() + 30);
+
+        const upcomingBirthdays = [];
+        const upcomingAnniversaries = [];
+
+        users.forEach(user => {
+            // Check Birthday
+            if (user.dateOfBirth) {
+                const dob = new Date(user.dateOfBirth);
+                const nextBirthday = new Date(today.getFullYear(), dob.getMonth(), dob.getDate());
+                
+                if (nextBirthday < todayNoTime) {
+                    nextBirthday.setFullYear(today.getFullYear() + 1);
+                }
+
+                if (nextBirthday >= todayNoTime && nextBirthday <= thirtyDaysFromNow) {
+                    upcomingBirthdays.push({
+                        user: { _id: user._id, firstName: user.firstName, lastName: user.lastName, profilePic: user.profilePic },
+                        date: nextBirthday,
+                        type: "Birthday"
+                    });
+                }
+            }
+
+            // Check Anniversary
+            if (user.joiningDate) {
+                const doj = new Date(user.joiningDate);
+                if (doj.getFullYear() < today.getFullYear()) {
+                    const nextAnniversary = new Date(today.getFullYear(), doj.getMonth(), doj.getDate());
+                    
+                    if (nextAnniversary < todayNoTime) {
+                        nextAnniversary.setFullYear(today.getFullYear() + 1);
+                    }
+
+                    if (nextAnniversary >= todayNoTime && nextAnniversary <= thirtyDaysFromNow) {
+                        const years = nextAnniversary.getFullYear() - doj.getFullYear();
+                        upcomingAnniversaries.push({
+                            user: { _id: user._id, firstName: user.firstName, lastName: user.lastName, profilePic: user.profilePic },
+                            date: nextAnniversary,
+                            years: years,
+                            type: "Anniversary"
+                        });
+                    }
+                }
+            }
+        });
+
+        upcomingBirthdays.sort((a, b) => a.date - b.date);
+        upcomingAnniversaries.sort((a, b) => a.date - b.date);
+
+        res.status(200).json({ upcomingBirthdays, upcomingAnniversaries, success: true });
+    } catch (error) {
+        console.error("GET UPCOMING EVENTS ERROR:", error);
+        res.status(500).json({ message: "Error fetching upcoming events", success: false });
+    }
+};
