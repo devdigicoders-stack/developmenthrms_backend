@@ -137,7 +137,13 @@ const UserSchema = new mongoose.Schema({
     fcmToken: {
         type: String,
         default: null
-    }
+    },
+    badges: [{
+        type: { type: String }, // e.g. "Star Performer"
+        month: { type: String }, // e.g. "July"
+        year: { type: Number }, // e.g. 2026
+        awardedAt: { type: Date, default: Date.now }
+    }]
 
 }, { timestamps: true })
 

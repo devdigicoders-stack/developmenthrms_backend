@@ -121,10 +121,28 @@ export const permission = {
     },
     Report: {
         VIEW_REPORT: "VIEW_REPORT",
+        VIEW_SALES_REPORTS: "VIEW_SALES_REPORTS",
+        VIEW_ALL_PERFORMANCE: "VIEW_ALL_PERFORMANCE",
     },
     Ticket: {
         RAISE_TICKET: "RAISE_TICKET",
         VIEW_TICKET: "VIEW_TICKET",
         MANAGE_TICKET: "MANAGE_TICKET",
+    },
+    Asset: {
+        CREATE_ASSET: "CREATE_ASSET",
+        EDIT_ASSET: "EDIT_ASSET",
+        DELETE_ASSET: "DELETE_ASSET",
+        MANAGE_ASSETS: "MANAGE_ASSETS",
+    },
+    Resignation: {
+        MANAGE_RESIGNATIONS: "MANAGE_RESIGNATIONS",
+    },
+    Quote: {
+        CREATE_QUOTE: "CREATE_QUOTE",
+        UPDATE_QUOTE: "UPDATE_QUOTE",
+        DELETE_QUOTE: "DELETE_QUOTE",
+        VIEW_QUOTE: "VIEW_QUOTE",
+        VIEW_ALL_QUOTES: "VIEW_ALL_QUOTES",
     }
 };

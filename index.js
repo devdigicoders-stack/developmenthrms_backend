@@ -27,6 +27,8 @@ import cookieParser from 'cookie-parser'
 import { startScheduler } from './utills/scheduler.js'
 import startAttendanceCron from './cron/attendanceCron.js'
 import startWishesCron from './cron/wishesCron.js'
+import startReminderCron from './cron/reminderCron.js'
+import startPerformanceCron from './cron/performanceCron.js'
 import PolicyRoute from './route/PolicyRoute.js'
 import NdaRoute from './route/NdaRoute.js'
 import OnboardingRoute from './route/OnboardingRoute.js'
@@ -34,7 +36,10 @@ import ComplaintRoute from './route/ComplaintRoute.js'
 import TicketRoute from './route/TicketRoute.js'
 import PaymentRoute from './route/PaymentRoute.js'
 import AssetRoute from './route/AssetRoute.js'
+import MeetingRoute from "./route/MeetingRoute.js";
+import SalesReportRoute from "./route/SalesReportRoute.js";
 import ResignationRoute from './route/ResignationRoute.js'
+import PerformanceRoute from './route/PerformanceRoute.js'
 
 import EnvData from './config/EnvData.js'
 const app = express();
@@ -77,15 +82,17 @@ app.use('/api/projects', ProjectRoute);
 app.use('/api/tasks', TaskRoute);
 app.use('/api/leads', LeadRoute);
 app.use('/api/quotes', QuoteRoute);
-app.use('/api/quote-profiles', QuoteProfileRoute);
+app.use("/api/meetings", MeetingRoute);
+app.use("/api/reports/sales", SalesReportRoute);
 app.use('/api/policies', PolicyRoute);
 app.use('/api/nda', NdaRoute);
 app.use('/api/onboarding', OnboardingRoute);
 app.use('/api/complaints', ComplaintRoute);
 app.use('/api/tickets', TicketRoute);
 app.use('/api/payments', PaymentRoute);
-app.use('/api/assets', AssetRoute);
+app.use('/api/assets', AssetRoute)
 app.use('/api/resignations', ResignationRoute);
+app.use('/api/performance', PerformanceRoute);
 
 app.get('/', (req, res) => {
     res.send("API is running")
@@ -105,6 +112,8 @@ const server = app.listen(EnvData.PORT, () => {
     startScheduler()
     startAttendanceCron()
     startWishesCron()
+    startReminderCron()
+    startPerformanceCron()
     console.log(`Server is running on port ${EnvData.PORT}`)
 })
 
