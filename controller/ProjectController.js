@@ -3,6 +3,7 @@ import Task from "../models/TaskSchema.js";
 import { createNotification } from "../utills/notificationHelper.js";
 import cloudinary from "../utills/cloudinary.js";
 import { uploadManyToCloudinary } from "../middleware/multer.js";
+import { getSubordinateIds } from "../utills/hierarchyHelper.js";
 
 const isProjectAdmin = (project, userId, userRole, userPermissions) =>
     userRole === "super_admin" ||
@@ -67,14 +68,37 @@ export const createProject = async (req, res) => {
 export const getProjects = async (req, res) => {
     try {
         const isSuperAdmin = req.user.role === "super_admin";
-        const isAdmin = isSuperAdmin || (req.user.permissions || []).some(p =>
+        const hasAdminPerm = (req.user.permissions || []).some(p =>
             ["VIEW_ALL_PROJECTS", "CREATE_PROJECT"].includes(p)
         );
         const filter = { isDeleted: false };
-        if (!isSuperAdmin) {
-            filter.companyId = req.user.company;
-            if (!isAdmin) filter.$or = [{ members: req.user.userId }, { createdBy: req.user.userId }, { clientIds: req.user.userId }];
+
+        if (isSuperAdmin) {
+            // Super Admin sees all projects across all companies
+        } else {
+            // Hierarchy filter:
+            // Get all subordinate user IDs (self + children + grandchildren)
+            // Admin B1 sees projects where B1's team members are involved
+            // Admin B2 does NOT see Admin B1's team projects
+            const allowedIds = await getSubordinateIds(req.user.userId);
+
+            if (hasAdminPerm) {
+                // Admin with permission: see all projects in their hierarchy's company scope
+                // but restrict to subordinate members
+                filter.$or = [
+                    { members: { $in: allowedIds } },
+                    { createdBy: { $in: allowedIds } }
+                ];
+            } else {
+                // Regular employee/manager: only their own projects
+                filter.$or = [
+                    { members: req.user.userId },
+                    { createdBy: req.user.userId },
+                    { clientIds: req.user.userId }
+                ];
+            }
         }
+
         const projects = await Project.find(filter)
             .populate("createdBy", "firstName lastName profilePic")
             .populate("members", "firstName lastName profilePic")

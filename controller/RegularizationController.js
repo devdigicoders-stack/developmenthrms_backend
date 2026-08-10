@@ -2,6 +2,7 @@ import Regularization from "../models/RegularizationSchema.js";
 import Attendance from "../models/AttendanceSchema.js";
 import User from "../models/UserSchema.js";
 import { createNotification } from "../utills/notificationHelper.js";
+import { getSubordinateIds } from "../utills/hierarchyHelper.js";
 
 // POST /api/regularization
 export const requestRegularization = async (req, res) => {
@@ -72,14 +73,18 @@ export const getCompanyRegularizations = async (req, res) => {
         const reqUser = await User.findById(req.user.userId).select("companyId role").populate("role", "name");
         if (!reqUser) return res.status(404).json({ message: "User not found", success: false });
 
-        // #17 — Always scope to company; super_admin must pass companyId explicitly
         const filter = {};
         if (reqUser.role?.name === "super_admin") {
+            // Super Admin: optionally filter by company
             if (req.query.companyId) filter.companyId = req.query.companyId;
-            // else returns all (super_admin intentional)
         } else {
-            filter.companyId = reqUser.companyId; // hard-scoped, cannot be overridden
+            // Hierarchy filter:
+            // Admin B1 → sirf B1 ki team ki regularization requests
+            // HR H → sirf H ke direct/indirect children ki requests
+            const allowedIds = await getSubordinateIds(req.user.userId);
+            filter.userId = { $in: allowedIds };
         }
+
         if (status) filter.status = status;
 
         const regs = await Regularization.find(filter)

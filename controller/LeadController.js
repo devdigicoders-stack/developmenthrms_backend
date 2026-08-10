@@ -2,6 +2,7 @@ import Lead from "../models/LeadSchema.js";
 import LeadFieldConfig from "../models/LeadFieldConfigSchema.js";
 import { createNotification } from "../utills/notificationHelper.js";
 import { parse } from "csv-parse/sync";
+import { getSubordinateIds } from "../utills/hierarchyHelper.js";
 
 // companyId comes from JWT — no extra DB call needed
 const cid = (req) => req.user.company;
@@ -17,14 +18,19 @@ export const getLeads = async (req, res) => {
         const companyId = cid(req);
         const isAdmin = req.user.role === "super_admin" || req.user.role === "admin";
 
-        if (isAdmin) {
-            if (req.user.role === "admin") {
-                filter.$or = [{ companyId }, { assignedTo: req.user.userId }];
-            } else {
-                filter.companyId = companyId;
-            }
+        if (req.user.role === "super_admin") {
+            // Super Admin sees all company leads
+            filter.companyId = companyId;
+            if (assignedTo) filter.assignedTo = assignedTo;
+        } else if (req.user.role === "admin") {
+            // Hierarchy filter: Admin sees only leads assigned to self & subordinates
+            const allowedIds = await getSubordinateIds(req.user.userId);
+            filter.assignedTo = { $in: allowedIds };
+            
+            // If specific user is requested, override (assuming UI restricts choice to subordinates)
             if (assignedTo) filter.assignedTo = assignedTo;
         } else {
+            // Employee sees only their own leads
             filter.assignedTo = req.user.userId;
         }
 

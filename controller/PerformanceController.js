@@ -2,6 +2,7 @@ import Task from "../models/TaskSchema.js";
 import Attendance from "../models/AttendanceSchema.js";
 import User from "../models/UserSchema.js";
 import mongoose from "mongoose";
+import { getSubordinateIds } from "../utills/hierarchyHelper.js";
 
 const cid = (req) => req.user.company ? new mongoose.Types.ObjectId(req.user.company) : null;
 
@@ -44,13 +45,19 @@ export const getPerformanceReport = async (req, res) => {
         const viewAll = isAdmin || (reqUser.permissions && reqUser.permissions.includes("VIEW_ALL_PERFORMANCE"));
         
         let usersToFetch = [];
-        if (viewAll) {
-             const userFilter = reqUser.role !== "super_admin" ? { companyId, isDeleted: false, isActive: true } : { isDeleted: false, isActive: true };
-             const users = await User.find(userFilter).select("_id firstName lastName profilePic");
-             usersToFetch = users;
+        if (reqUser.role === "super_admin") {
+            // Super Admin sees everyone
+            const users = await User.find({ isDeleted: false, isActive: true }).select("_id firstName lastName profilePic");
+            usersToFetch = users;
+        } else if (viewAll) {
+            // Admin/Manager with permission: hierarchy filter — only their subordinates
+            const allowedIds = await getSubordinateIds(reqUser.userId);
+            const users = await User.find({ _id: { $in: allowedIds }, isDeleted: false, isActive: true }).select("_id firstName lastName profilePic");
+            usersToFetch = users;
         } else {
-             const user = await User.findById(reqUser.userId).select("_id firstName lastName profilePic");
-             if(user) usersToFetch = [user];
+            // Regular employee: only self
+            const user = await User.findById(reqUser.userId).select("_id firstName lastName profilePic");
+            if (user) usersToFetch = [user];
         }
 
         const userIds = usersToFetch.map(u => u._id);

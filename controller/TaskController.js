@@ -4,6 +4,7 @@ import User from "../models/UserSchema.js";
 import cloudinary from "../utills/cloudinary.js";
 import { createNotification } from "../utills/notificationHelper.js";
 import { uploadManyToCloudinary } from "../middleware/multer.js";
+import { getSubordinateIds } from "../utills/hierarchyHelper.js";
 
 const populateTask = (query) =>
     query
@@ -74,7 +75,8 @@ export const getTasksByProject = async (req, res) => {
     try {
         const { projectId } = req.params;
         const userId = req.user.userId;
-        const isAdmin = req.user.role === "super_admin" || (req.user.permissions || []).some(p =>
+        const isSuperAdmin = req.user.role === "super_admin";
+        const hasTaskPerm = (req.user.permissions || []).some(p =>
             ["VIEW_ALL_TASKS", "CREATE_TASK"].includes(p)
         );
 
@@ -82,7 +84,21 @@ export const getTasksByProject = async (req, res) => {
         const isClient = project?.clientIds?.some(id => id.toString() === userId);
 
         const filter = { project: projectId, isDeleted: false };
-        if (!isAdmin && !isClient) filter.$or = [{ assignedTo: userId }, { qaAssignedTo: userId }];
+
+        if (isSuperAdmin) {
+            // Super Admin sees all tasks
+        } else if (hasTaskPerm) {
+            // Admin/Manager with permission: see tasks assigned to their subordinates
+            const allowedIds = await getSubordinateIds(userId);
+            filter.$or = [
+                { assignedTo: { $in: allowedIds } },
+                { qaAssignedTo: { $in: allowedIds } },
+                { createdBy: { $in: allowedIds } },
+            ];
+        } else if (!isClient) {
+            // Regular employee: only tasks assigned to them
+            filter.$or = [{ assignedTo: userId }, { qaAssignedTo: userId }];
+        }
 
         const tasks = await populateTask(Task.find(filter).sort({ createdAt: -1 }));
         res.json({ success: true, data: tasks });

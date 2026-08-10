@@ -8,6 +8,7 @@ import { loginTemplate, userCreatedTemplate, resetPasswordOtpTemplate } from "..
 import EnvData from "../config/EnvData.js";
 import { createNotification } from "../utills/notificationHelper.js";
 import { uploadToCloudinary } from "../middleware/multer.js";
+import { getSubordinateIds } from "../utills/hierarchyHelper.js";
 
 const normalizeDate = (date) => {
     if (!date) return null;
@@ -235,6 +236,8 @@ export const getAllUsers = async (req, res) => {
     try {
         const currentUser = await User.findById(req.user.userId).select("role companyId").populate("role", "name");
         if (!currentUser) return res.status(404).json({ message: "User not found", success: false });
+
+        // Super Admin — no filter, sees everyone
         if (currentUser?.role?.name === "super_admin") {
             const users = await User.find().select("-password -otp")
                 .populate("role", "name").populate("companyId", "name")
@@ -246,7 +249,13 @@ export const getAllUsers = async (req, res) => {
                 .populate("updatedBy", "firstName lastName");
             return res.status(200).json({ users, totalCount: users.length, success: true });
         }
-        const users = await User.find({ companyId: currentUser.companyId }).select("-password -otp")
+
+        // All other roles — Hierarchy filter:
+        // Only see self + direct/indirect subordinates (children, grandchildren...)
+        // Admin B1 will NOT see Admin B2's data even if both are in same company
+        const allowedIds = await getSubordinateIds(req.user.userId);
+
+        const users = await User.find({ _id: { $in: allowedIds } }).select("-password -otp")
             .populate("role", "name").populate("companyId", "name")
             .populate("department", "name")
             .populate("workShift", "name startTime endTime")

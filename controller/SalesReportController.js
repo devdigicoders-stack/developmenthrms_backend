@@ -3,6 +3,7 @@ import Quote from "../models/QuoteSchema.js";
 import Meeting from "../models/MeetingSchema.js";
 import User from "../models/UserSchema.js";
 import mongoose from "mongoose";
+import { getSubordinateIds } from "../utills/hierarchyHelper.js";
 
 // helper
 const cid = (req) => req.user.company ? new mongoose.Types.ObjectId(req.user.company) : null;
@@ -14,8 +15,10 @@ export const getSalesReport = async (req, res) => {
         
         let matchQuery = {};
         
-        // If not super_admin, filter by companyId
-        if (req.user.role !== "super_admin") {
+        const user = await User.findById(req.user.userId).populate("role");
+        const roleName = user?.role?.name || req.user.role; // Fallback to jwt
+
+        if (roleName !== "super_admin") {
             matchQuery.companyId = companyId;
         }
 
@@ -26,31 +29,47 @@ export const getSalesReport = async (req, res) => {
             };
         }
 
+        let leadMatchQuery = { ...matchQuery };
+        let quoteMatchQuery = { ...matchQuery };
+        let meetingMatchQuery = { ...matchQuery };
+
+        if (roleName === "admin") {
+            // Hierarchy filter
+            const allowedIds = await getSubordinateIds(req.user.userId);
+            leadMatchQuery.assignedTo = { $in: allowedIds };
+            quoteMatchQuery.createdBy = { $in: allowedIds };
+            meetingMatchQuery.assignedTo = { $in: allowedIds };
+        } else if (roleName !== "super_admin") {
+            leadMatchQuery.assignedTo = req.user.userId;
+            quoteMatchQuery.createdBy = req.user.userId;
+            meetingMatchQuery.assignedTo = req.user.userId;
+        }
+
         // 1. Total Leads
-        const totalLeads = await Lead.countDocuments(matchQuery);
+        const totalLeads = await Lead.countDocuments(leadMatchQuery);
 
         // 2. Converted Leads ("Project Done")
         const totalConversions = await Lead.countDocuments({ 
-            ...matchQuery, 
+            ...leadMatchQuery, 
             status: "Project Done"
         });
 
         // 3. Meetings Done
         const totalMeetings = await Meeting.countDocuments({
-            ...matchQuery,
+            ...meetingMatchQuery,
             status: "Completed"
         });
 
         // 4. Revenue (Accepted Quotes)
         const acceptedQuotes = await Quote.find({
-            ...matchQuery,
+            ...quoteMatchQuery,
             status: "accepted"
         });
         const totalRevenue = acceptedQuotes.reduce((sum, q) => sum + (q.grandTotal || 0), 0);
 
         // BDE Performance Aggregation
         const leadAgg = await Lead.aggregate([
-            { $match: matchQuery },
+            { $match: leadMatchQuery },
             { 
                 $group: { 
                     _id: "$assignedTo", 
@@ -61,7 +80,7 @@ export const getSalesReport = async (req, res) => {
         ]);
 
         const quoteAgg = await Quote.aggregate([
-            { $match: { ...matchQuery, status: "accepted" } },
+            { $match: { ...quoteMatchQuery, status: "accepted" } },
             {
                 $lookup: {
                     from: "leads",
@@ -80,7 +99,7 @@ export const getSalesReport = async (req, res) => {
         ]);
 
         const meetingAgg = await Meeting.aggregate([
-            { $match: { ...matchQuery, status: "Completed" } },
+            { $match: { ...meetingMatchQuery, status: "Completed" } },
             {
                 $group: {
                     _id: "$assignedTo",

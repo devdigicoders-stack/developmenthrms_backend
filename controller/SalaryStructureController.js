@@ -1,5 +1,6 @@
 import SalaryStructure from "../models/SalaryStructureSchema.js";
 import User from "../models/UserSchema.js";
+import { getSubordinateIds } from "../utills/hierarchyHelper.js";
 
 // Compute monthly totals from components + basic
 const computeTotals = (basic, components) => {
@@ -92,7 +93,16 @@ export const getCompanySalaryStructures = async (req, res) => {
     try {
         const reqUser = await User.findById(req.user.userId).select("companyId role").populate("role", "name");
         const filter = { isActive: true };
-        if (reqUser.role?.name !== "super_admin") filter.companyId = reqUser.companyId;
+
+        if (reqUser.role?.name === "super_admin") {
+            // Super Admin sees all salary structures
+        } else {
+            // Hierarchy filter:
+            // Admin B1 sees salary structures of B1's team only
+            // Admin B2's team salary structures are NOT visible to Admin B1
+            const allowedIds = await getSubordinateIds(req.user.userId);
+            filter.userId = { $in: allowedIds };
+        }
 
         const structures = await SalaryStructure.find(filter)
             .populate("userId", "firstName lastName employeeCode department designation profilePic")

@@ -6,6 +6,7 @@ import LeaveType from "../models/leaveTypeSchema.js";
 import User from "../models/UserSchema.js";
 import Holiday from "../models/HolidaySchema.js";
 import { createNotification } from "../utills/notificationHelper.js";
+import { getSubordinateIds } from "../utills/hierarchyHelper.js";
 
 // Count total working days in a month (excluding weekends + holidays)
 const getWorkingDays = async (month, companyId, weekOff = [0, 6]) => {
@@ -187,7 +188,16 @@ export const getPayrollRuns = async (req, res) => {
         const { month, status } = req.query;
         const reqUser = await User.findById(req.user.userId).select("companyId role").populate("role", "name");
         const filter = {};
-        if (reqUser.role?.name !== "super_admin") filter.companyId = reqUser.companyId;
+
+        if (reqUser.role?.name === "super_admin") {
+            // Super Admin sees all payroll records
+        } else {
+            // Hierarchy filter: Admin B1 sees only B1's team payroll
+            // Admin B2's team payroll is NOT visible to Admin B1
+            const allowedIds = await getSubordinateIds(req.user.userId);
+            filter.userId = { $in: allowedIds };
+        }
+
         if (month) filter.month = month;
         if (status) filter.status = status;
 
@@ -268,9 +278,17 @@ export const bulkApprovePayroll = async (req, res) => {
         const { month } = req.body;
         if (!month) return res.status(400).json({ message: "month is required", success: false });
 
-        const reqUser = await User.findById(req.user.userId).select("companyId");
+        const reqUser = await User.findById(req.user.userId).select("companyId role").populate("role", "name");
+        let matchFilter = { month, status: "draft" };
+
+        if (reqUser.role?.name !== "super_admin") {
+            // Hierarchy filter: only approve payroll of own subordinates
+            const allowedIds = await getSubordinateIds(req.user.userId);
+            matchFilter.userId = { $in: allowedIds };
+        }
+
         const result = await PayrollRun.updateMany(
-            { companyId: reqUser.companyId, month, status: "draft" },
+            matchFilter,
             { $set: { status: "approved", approvedBy: req.user.userId, approvedAt: new Date(), updatedBy: req.user.userId } }
         );
 
@@ -311,9 +329,17 @@ export const bulkMarkPaid = async (req, res) => {
         const { month } = req.body;
         if (!month) return res.status(400).json({ message: "month is required", success: false });
 
-        const reqUser = await User.findById(req.user.userId).select("companyId");
+        const reqUser = await User.findById(req.user.userId).select("companyId role").populate("role", "name");
+        let matchFilter = { month, status: "approved" };
+
+        if (reqUser.role?.name !== "super_admin") {
+            // Hierarchy filter: only mark paid for own subordinates' payroll
+            const allowedIds = await getSubordinateIds(req.user.userId);
+            matchFilter.userId = { $in: allowedIds };
+        }
+
         const result = await PayrollRun.updateMany(
-            { companyId: reqUser.companyId, month, status: "approved" },
+            matchFilter,
             { $set: { status: "paid", paidAt: new Date(), updatedBy: req.user.userId } }
         );
 
@@ -344,9 +370,16 @@ export const getPayrollSummary = async (req, res) => {
 
         const reqUser = await User.findById(req.user.userId).select("companyId role").populate("role", "name");
         const filter = { month };
-        if (reqUser.role?.name !== "super_admin") {
-            filter.companyId = reqUser.companyId;
+
+        if (reqUser.role?.name === "super_admin") {
+            // Super Admin: sees all payroll summary
+        } else {
+            // Hierarchy filter: Admin B1 gets summary of only B1's team
+            // Admin B2's team payroll is NOT counted in B1's summary
+            const allowedIds = await getSubordinateIds(req.user.userId);
+            filter.userId = { $in: allowedIds };
         }
+
         const runs = await PayrollRun.find(filter).lean();
 
         const summary = {

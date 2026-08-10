@@ -1,5 +1,6 @@
 import Complaint from "../models/ComplaintSchema.js";
 import User from "../models/UserSchema.js";
+import { getSubordinateIds } from "../utills/hierarchyHelper.js";
 
 export const createComplaint = async (req, res) => {
     try {
@@ -52,13 +53,12 @@ export const getAllComplaints = async (req, res) => {
         const isSuperAdmin = req.user.role === 'super_admin' || user?.role?.name === 'super_admin';
 
         let filter = {};
-        if (!isSuperAdmin) {
-            let companyId = req.user.company || user?.companyId;
-            if (companyId) {
-                filter.companyId = companyId;
-            } else {
-                return res.status(200).json({ success: true, complaints: [] });
-            }
+        if (isSuperAdmin) {
+            // Super Admin sees all complaints
+        } else {
+            // Hierarchy filter: only see complaints from subordinates
+            const allowedIds = await getSubordinateIds(req.user.userId);
+            filter.userId = { $in: allowedIds };
         }
 
         const complaints = await Complaint.find(filter)

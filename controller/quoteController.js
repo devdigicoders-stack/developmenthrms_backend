@@ -2,6 +2,8 @@ import Quote from "../models/QuoteSchema.js";
 import Lead from "../models/LeadSchema.js";
 import LeadFieldConfig from "../models/LeadFieldConfigSchema.js";
 import QuoteProfile from "../models/QuoteProfileSchema.js";
+import User from "../models/UserSchema.js";
+import { getSubordinateIds } from "../utills/hierarchyHelper.js";
 import { sendMail } from "../utills/SendEmail.js";
 import { buildQuoteHtml } from "../utills/quoteHtmlBuilder.js";
 import { resolveQuoteBranding } from "../utills/resolveQuoteBranding.js";
@@ -224,6 +226,22 @@ export const getAllQuotes = async (req, res) => {
         const companyId = req.user.company || null; // JWT stores company field
         const { status, search, page = 1, limit = 30 } = req.query;
         const filter = { companyId: { $in: [companyId, null] } };
+
+        const user = await User.findById(req.user.userId).populate("role");
+        const isSuperAdmin = user?.role?.name === "super_admin";
+        const isAdmin = user?.role?.name === "admin";
+
+        if (isSuperAdmin) {
+            // Sees all company quotes
+        } else if (isAdmin) {
+            // Hierarchy filter: Admin sees only quotes created by self & subordinates
+            const allowedIds = await getSubordinateIds(req.user.userId);
+            filter.createdBy = { $in: allowedIds };
+        } else {
+            // Employee sees only their own quotes
+            filter.createdBy = req.user.userId;
+        }
+
         if (status) {
             const VALID = ["draft", "sent", "accepted", "rejected"];
             if (!VALID.includes(status)) return res.status(400).json({ message: "Invalid status filter", success: false });

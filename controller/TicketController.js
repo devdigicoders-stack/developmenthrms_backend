@@ -1,6 +1,7 @@
 import Ticket from "../models/TicketSchema.js";
 import { createNotification } from "../utills/notificationHelper.js";
 import User from "../models/UserSchema.js";
+import { getSubordinateIds } from "../utills/hierarchyHelper.js";
 
 export const createTicket = async (req, res) => {
     try {
@@ -37,13 +38,18 @@ export const createTicket = async (req, res) => {
 
 export const getTickets = async (req, res) => {
     try {
+        const isSuperAdmin = req.user.role === "super_admin";
+        const canManage = isSuperAdmin || (req.user.permissions || []).includes("MANAGE_TICKET");
         const query = {};
-        if (req.user.role !== "super_admin") {
-            query.companyId = req.user.company;
-        }
-        
-        const canManage = req.user.role === "super_admin" || (req.user.permissions || []).includes("MANAGE_TICKET");
-        if (!canManage) {
+
+        if (isSuperAdmin) {
+            // Super Admin sees all tickets
+        } else if (canManage) {
+            // Admin/Manager with permission: see tickets from subordinates only
+            const allowedIds = await getSubordinateIds(req.user.userId);
+            query.userId = { $in: allowedIds };
+        } else {
+            // Regular employee: only their own tickets
             query.userId = req.user.userId;
         }
 

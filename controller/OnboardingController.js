@@ -3,6 +3,7 @@ import User from "../models/UserSchema.js";
 import SalaryStructure from "../models/SalaryStructureSchema.js";
 import Role from "../models/roleSchema.js";
 import { uploadToCloudinary } from "../middleware/multer.js";
+import { getSubordinateIds } from "../utills/hierarchyHelper.js";
 import { createNotification } from "../utills/notificationHelper.js";
 import { sendMail } from "../utills/SendEmail.js";
 import { generateOfferPdfBuffer } from "../utills/offerPdfGenerator.js";
@@ -140,14 +141,23 @@ export const submitOnboardingForm = async (req, res) => {
 
 export const getPendingOnboardingRequests = async (req, res) => {
     try {
+        const reqUser = await User.findById(req.user.userId).populate("role");
+        const isSuperAdmin = reqUser?.role?.name === "super_admin";
+
         const query = {};
-        if (req.user.company) {
-            query.companyId = req.user.company;
+        if (isSuperAdmin) {
+            // Super Admin sees all onboarding requests
+        } else {
+            // Hierarchy filter:
+            // Admin B1 sees onboarding requests of B1's hierarchy only
+            // Admin B2's employees' requests are NOT visible to Admin B1
+            const allowedIds = await getSubordinateIds(req.user.userId);
+            query.user = { $in: allowedIds };
         }
-        
+
         const requests = await OnboardingForm.find(query)
             .populate("user", "firstName lastName email phone dateOfBirth gender");
-        
+
         res.status(200).json({ requests, success: true });
     } catch (error) {
         res.status(500).json({ message: "Error fetching onboarding requests", success: false });

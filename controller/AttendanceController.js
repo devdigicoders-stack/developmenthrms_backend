@@ -3,6 +3,7 @@ import User from "../models/UserSchema.js";
 import WorkShift from "../models/workShiftSchema.js";
 import Role from "../models/roleSchema.js";
 import { createNotification } from "../utills/notificationHelper.js";
+import { getSubordinateIds } from "../utills/hierarchyHelper.js";
 // hhhhh
 const notifyAdmins = async (companyId, title, message) => {
     try {
@@ -329,8 +330,16 @@ export const getCompanyAttendance = async (req, res) => {
         if (!reqUser) return res.status(404).json({ message: "User not found", success: false });
 
         const filter = {};
-        if (reqUser.role?.name !== "super_admin") filter.companyId = reqUser.companyId;
-        
+
+        if (reqUser.role?.name === "super_admin") {
+            // Super Admin sees all attendance records
+        } else {
+            // Hierarchy filter: only see attendance of self + subordinates
+            // Admin B1 sees H, E, Z but NOT Admin B2's data
+            const allowedIds = await getSubordinateIds(req.user.userId);
+            filter.userId = { $in: allowedIds };
+        }
+
         if (startDate && endDate) {
             filter.date = { $gte: startDate, $lte: endDate };
         } else if (date) {
@@ -338,7 +347,8 @@ export const getCompanyAttendance = async (req, res) => {
         } else if (month) {
             filter.date = { $regex: `^${month}` };
         }
-        
+
+        // Admin can further filter down to a specific user
         if (userId) filter.userId = userId;
 
         const records = await Attendance.find(filter)
@@ -354,3 +364,4 @@ export const getCompanyAttendance = async (req, res) => {
         res.status(500).json({ message: "Error fetching company attendance", success: false });
     }
 };
+

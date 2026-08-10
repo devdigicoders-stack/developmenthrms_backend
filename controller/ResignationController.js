@@ -1,6 +1,7 @@
 import Resignation from "../models/ResignationSchema.js";
 import User from "../models/UserSchema.js";
 import { createNotification } from "../utills/notificationHelper.js";
+import { getSubordinateIds } from "../utills/hierarchyHelper.js";
 
 // POST /api/resignations
 export const submitResignation = async (req, res) => {
@@ -77,18 +78,17 @@ export const getMyResignation = async (req, res) => {
 // GET /api/resignations
 export const getAllResignations = async (req, res) => {
     try {
-        let companyId = req.user.companyId;
-        let isSuperAdmin = false;
+        const user = await User.findById(req.user.userId).populate("role");
+        const isSuperAdmin = user?.role?.name === "super_admin";
 
-        if (!companyId) {
-            const user = await User.findById(req.user.userId).populate("role");
-            companyId = user?.companyId;
-            if (user?.role?.name === "super_admin") {
-                isSuperAdmin = true;
-            }
+        let query = {};
+        if (isSuperAdmin) {
+            // Super Admin sees all
+        } else {
+            // Hierarchy filter: only see resignations of subordinates
+            const allowedIds = await getSubordinateIds(req.user.userId);
+            query.employeeId = { $in: allowedIds };
         }
-
-        const query = isSuperAdmin ? {} : { companyId };
 
         const resignations = await Resignation.find(query)
             .populate("employeeId", "firstName lastName email profilePic employeeCode designation department")

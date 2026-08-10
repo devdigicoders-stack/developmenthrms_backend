@@ -1,6 +1,7 @@
 import Asset from "../models/AssetSchema.js";
 import User from "../models/UserSchema.js";
 import { createNotification } from "../utills/notificationHelper.js";
+import { getSubordinateIds } from "../utills/hierarchyHelper.js";
 
 // POST /api/assets
 export const createAsset = async (req, res) => {
@@ -39,19 +40,24 @@ export const createAsset = async (req, res) => {
 // GET /api/assets
 export const getAssets = async (req, res) => {
     try {
-        let companyId = req.user.companyId;
-        let isSuperAdmin = false;
-        
-        if (!companyId) {
-            const user = await User.findById(req.user.userId).populate("role");
-            companyId = user?.companyId;
-            if (user?.role?.name === "super_admin") {
-                isSuperAdmin = true;
-            }
+        const user = await User.findById(req.user.userId).populate("role");
+        const isSuperAdmin = user?.role?.name === "super_admin";
+
+        let query = {};
+        if (isSuperAdmin) {
+            // Super Admin sees all assets
+        } else {
+            // Hierarchy filter:
+            // Admin B1 sees assets assigned to B1's team only
+            // Admin B2's team assets are NOT visible to Admin B1
+            const allowedIds = await getSubordinateIds(req.user.userId);
+            // Show unassigned assets OR assets assigned to subordinates
+            query.$or = [
+                { assignedTo: null },
+                { assignedTo: { $in: allowedIds } }
+            ];
         }
 
-        const query = isSuperAdmin ? {} : { companyId };
-        
         const assets = await Asset.find(query)
             .populate("assignedTo", "firstName lastName email")
             .populate("createdBy", "firstName lastName")

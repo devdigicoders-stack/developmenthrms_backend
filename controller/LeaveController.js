@@ -4,6 +4,7 @@ import LeaveType from "../models/leaveTypeSchema.js";
 import Holiday from "../models/HolidaySchema.js";
 import User from "../models/UserSchema.js";
 import { createNotification } from "../utills/notificationHelper.js";
+import { getSubordinateIds } from "../utills/hierarchyHelper.js";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 const getUser = (userId) => User.findById(userId).select("companyId role").populate("role", "name");
@@ -209,22 +210,20 @@ export const getCompanyLeaves = async (req, res) => {
         const roleName = reqUser.role?.name;
         const filter = {};
 
-        // #17/#18 — Hard-scope to company; super_admin may pass companyId param
         if (roleName === "super_admin") {
+            // Super Admin — no restriction, may optionally filter by company
             if (req.query.companyId) filter.companyId = req.query.companyId;
         } else {
-            filter.companyId = reqUser.companyId;
+            // Hierarchy filter:
+            // Admin B1 sees only H, E, Z leaves — NOT Admin B2's team leaves
+            // HR H sees only Employee E's leaves — NOT Employee Z (Z reports to B1)
+            const allowedIds = await getSubordinateIds(req.user.userId);
+            filter.userId = { $in: allowedIds };
         }
 
         if (year) filter.fromDate = { $regex: `^${year}` };
         if (status) filter.status = status;
-        if (userId) filter.userId = userId;
-
-        // Managers only see their direct reports' leaves
-        if (roleName !== "super_admin" && roleName !== "admin") {
-            const directReports = await User.find({ reportingTo: req.user.userId, isDeleted: false }).select("_id");
-            filter.userId = { $in: directReports.map(u => u._id) };
-        }
+        if (userId) filter.userId = userId; // admin can drill down to specific user
 
         const leaves = await LeaveApplication.find(filter)
             .populate("userId", "firstName lastName employeeCode profilePic companyId")
