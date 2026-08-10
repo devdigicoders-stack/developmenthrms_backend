@@ -234,6 +234,11 @@ export const approveOnboarding = async (req, res) => {
         const joinDate = new Date(user.dateOfJoining || Date.now()).toLocaleDateString('en-US', dateOptions);
         const roleName = user.designation?.name || user.role?.name || 'Developer';
         const companyName = company?.name || 'DigiCoders';
+        let logoUrl = company?.icon?.url || '';
+        if (logoUrl && logoUrl.startsWith('/')) {
+            const protocol = req.protocol === 'http' && req.get('host').includes('localhost') ? 'http' : 'https';
+            logoUrl = `${protocol}://${req.get('host')}${logoUrl}`;
+        }
 
         const pdfHtml = `
             <!DOCTYPE html>
@@ -261,10 +266,10 @@ export const approveOnboarding = async (req, res) => {
             <body>
                 <!-- Page 1 -->
                 <div class="page">
-                    ${company?.icon?.url ? '<img src="' + company.icon.url + '" class="watermark" />' : ''}
+                    ${logoUrl ? '<img src="' + logoUrl + '" class="watermark" />' : ''}
                     <div class="content-wrapper">
                         <div class="header-logo">
-                            ${company?.icon?.url ? '<img src="' + company.icon.url + '" />' : '<div class="header-title">' + companyName + '</div>'}
+                            ${logoUrl ? '<img src="' + logoUrl + '" />' : '<div class="header-title">' + companyName + '</div>'}
                         </div>
                         <div class="title">Offer Letter</div>
                         <p>Dated: ${today}</p>
@@ -286,7 +291,7 @@ export const approveOnboarding = async (req, res) => {
                 </div>
                 <!-- Page 2 -->
                 <div class="page">
-                    ${company?.icon?.url ? '<img src="' + company.icon.url + '" class="watermark" />' : ''}
+                    ${logoUrl ? '<img src="' + logoUrl + '" class="watermark" />' : ''}
                     <div class="content-wrapper">
                         <p class="mt-8">Please sign and return to the undersigned the duplicate copy of this letter signifying your acceptance.</p>
                         <p>We welcome you to ${companyName} family and look forward to a fruitful collaboration. We are confident that your contribution will take us further in our journey towards becoming world leaders. We assure you of our support for your professional development and growth.</p>
@@ -414,7 +419,13 @@ export const downloadOfferLetterPdf = async (req, res) => {
         const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
         const joinDate = new Date(salary.createdAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
         const currentYear = new Date().getFullYear();
-        const logoUrl = company?.icon?.url || '';
+        let logoUrl = company?.icon?.url || '';
+        
+        // Ensure logoUrl is absolute for Puppeteer to render
+        if (logoUrl && logoUrl.startsWith('/')) {
+            const protocol = req.protocol === 'http' && req.get('host').includes('localhost') ? 'http' : 'https';
+            logoUrl = `${protocol}://${req.get('host')}${logoUrl}`;
+        }
 
         const htmlContent = `
             <!DOCTYPE html>
@@ -506,5 +517,24 @@ export const downloadOfferLetterPdf = async (req, res) => {
     } catch (error) {
         console.error("Download Offer Letter Error:", error);
         res.status(500).json({ message: "Failed to generate offer letter PDF", success: false });
+    }
+};
+
+export const downloadEmployeeOfferLetterPdf = async (req, res) => {
+    try {
+        const originalUserId = req.user?.userId;
+        if (!req.user) req.user = {};
+        req.user.userId = req.params.userId;
+        
+        await downloadOfferLetterPdf(req, res);
+        
+        if (originalUserId) {
+            req.user.userId = originalUserId;
+        }
+    } catch (error) {
+        console.error("Download Employee Offer Letter Error:", error);
+        if (!res.headersSent) {
+            res.status(500).json({ message: "Failed to generate employee offer letter PDF", success: false });
+        }
     }
 };

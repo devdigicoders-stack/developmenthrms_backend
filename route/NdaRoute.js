@@ -9,7 +9,8 @@ import {
     skipClientNda, 
     signClientNda,
     getClientNdaSignatures,
-    getClientNdaTemplate
+    getClientNdaTemplate,
+    getEmployeeSignatures
 } from '../controller/NdaController.js';
 import { protect, authorize, hasPermission } from '../middleware/authMiddleware.js';
 import upload from '../middleware/multer.js';
@@ -28,6 +29,7 @@ router.post('/:ndaId/sign', signNda);
 
 // Admin Routes
 router.get('/client/signatures', hasPermission("MANAGE_NDA"), getClientNdaSignatures);
+router.get('/employee-signatures/:userId', hasPermission("MANAGE_NDA"), getEmployeeSignatures);
 router.post('/', hasPermission("MANAGE_NDA"), upload.single("file"), createOrUpdateNda);
 router.get('/:ndaId/signatures', hasPermission("MANAGE_NDA"), getNdaSignatures);
 router.delete('/:id', hasPermission("MANAGE_NDA"), deleteNda);

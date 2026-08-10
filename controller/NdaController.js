@@ -426,3 +426,14 @@ export const getClientNdaTemplate = async (req, res) => {
         res.status(500).json({ message: "Error fetching Client NDA template", success: false });
     }
 };
+
+export const getEmployeeSignatures = async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const signatures = await NdaSignature.find({ userId }).populate('ndaId', 'title document targetAudience');
+        res.status(200).json({ signatures, success: true });
+    } catch (error) {
+        console.error("Get Employee Signatures Error:", error);
+        res.status(500).json({ message: "Error fetching employee signatures", success: false });
+    }
+};
