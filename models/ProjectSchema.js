@@ -41,6 +41,7 @@ const ProjectSchema = new mongoose.Schema({
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     members: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
     fileBundles: [FileBundleSchema],
+    leadId: { type: mongoose.Schema.Types.ObjectId, ref: "Lead", default: null },
     isDeleted: { type: Boolean, default: false },
 }, { timestamps: true });
 

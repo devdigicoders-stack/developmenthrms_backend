@@ -199,6 +199,25 @@ export const updateLead = async (req, res) => {
             });
         }
 
+        // Auto-create project if status changed to "Sent to Project Team"
+        if ($set.status === "Sent to Project Team" && current.status !== "Sent to Project Team") {
+            const { default: Project } = await import("../models/ProjectSchema.js");
+            // Check if project already exists for this lead
+            const existingProject = await Project.findOne({ leadId: lead._id });
+            if (!existingProject) {
+                await Project.create({
+                    name: lead.orgName || `Project for ${lead.contactNumber}`,
+                    description: `Automatically created from Lead: ${lead.orgName}`,
+                    status: "active",
+                    companyId: lead.companyId || req.user.company,
+                    members: [], // User requested to leave members empty for manual assignment
+                    clientIds: [], // User requested to leave clients empty for manual assignment
+                    leadId: lead._id,
+                    createdBy: req.user.userId
+                });
+            }
+        }
+
         res.json({ lead, message: "Lead updated", success: true });
     } catch (err) {
         if (err.code === 11000)

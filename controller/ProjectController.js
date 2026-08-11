@@ -155,6 +155,21 @@ export const updateProject = async (req, res) => {
             });
         }
 
+        // Auto-update lead if status is completed
+        if (req.body.status === "completed" && existing.status !== "completed" && project.leadId) {
+            const { default: Lead } = await import("../models/LeadSchema.js");
+            await Lead.findByIdAndUpdate(project.leadId, { 
+                $set: { status: "Project Done" },
+                $push: { 
+                    history: { 
+                        changedBy: req.user.userId, 
+                        changedAt: new Date(), 
+                        changes: { status: { from: existing?.status || "Sent to Project Team", to: "Project Done" } } 
+                    } 
+                }
+            });
+        }
+
         res.json({ success: true, data: project });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });

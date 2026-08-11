@@ -474,6 +474,10 @@ export const saveFcmToken = async (req, res) => {
 export const getUpcomingEvents = async (req, res) => {
     try {
         const currentUser = await User.findById(req.user.userId).populate("role");
+        if (!currentUser) {
+            return res.status(404).json({ message: "User not found", success: false });
+        }
+        
         const companyId = currentUser.role?.name === "super_admin" ? null : currentUser.companyId;
 
         const query = { isActive: true };
@@ -546,8 +550,8 @@ export const getAllClients = async (req, res) => {
         const currentUser = await User.findById(req.user.userId).populate("role", "name");
         if (!currentUser) return res.status(404).json({ message: "User not found", success: false });
 
-        const clientRole = await Role.findOne({ name: "Client" });
-        if (!clientRole) return res.status(404).json({ message: "Client role not found", success: false });
+        const clientRole = await Role.findOne({ name: { $regex: /^client$/i } });
+        if (!clientRole) return res.status(200).json({ users: [], totalCount: 0, success: true });
 
         let clientIdsToFetch = [];
 
