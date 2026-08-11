@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import dotenv from "dotenv";
 import bcrypt from "bcryptjs";
-import Role from "../models/RoleSchema.js";
+import Role from "../models/roleSchema.js";
 import User from "../models/UserSchema.js";
 import { permission } from "../config/permission.js";
 import { SUPER_ADMIN_ONLY_PERMISSIONS } from "../config/superAdminOnly.js";

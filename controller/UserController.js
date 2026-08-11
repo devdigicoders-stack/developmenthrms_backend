@@ -1,6 +1,6 @@
 import User from "../models/UserSchema.js";
 import Company from "../models/CompanySchema.js";
-import Role from "../models/RoleSchema.js";
+import Role from "../models/roleSchema.js";
 import Project from "../models/ProjectSchema.js";
 import bcrypt from "bcryptjs";
 import cloudinary from "../utills/cloudinary.js";
