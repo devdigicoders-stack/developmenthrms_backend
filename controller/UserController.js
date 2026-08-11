@@ -1,5 +1,7 @@
 import User from "../models/UserSchema.js";
 import Company from "../models/CompanySchema.js";
+import Role from "../models/RoleSchema.js";
+import Project from "../models/ProjectSchema.js";
 import bcrypt from "bcryptjs";
 import cloudinary from "../utills/cloudinary.js";
 import { sendMail } from "../utills/SendEmail.js";
@@ -536,5 +538,52 @@ export const getUpcomingEvents = async (req, res) => {
     } catch (error) {
         console.error("GET UPCOMING EVENTS ERROR:", error);
         res.status(500).json({ message: "Error fetching upcoming events", success: false });
+    }
+};
+
+export const getAllClients = async (req, res) => {
+    try {
+        const currentUser = await User.findById(req.user.userId).populate("role", "name");
+        if (!currentUser) return res.status(404).json({ message: "User not found", success: false });
+
+        const clientRole = await Role.findOne({ name: "Client" });
+        if (!clientRole) return res.status(404).json({ message: "Client role not found", success: false });
+
+        let clientIdsToFetch = [];
+
+        if (currentUser.role?.name === "super_admin") {
+            // Super Admin sees all clients
+            const clients = await User.find({ role: clientRole._id }).select("-password -otp")
+                .populate("role", "name").populate("companyId", "name");
+            return res.status(200).json({ users: clients, totalCount: clients.length, success: true });
+        } else {
+            // Find projects created by or where the user is a member
+            const projects = await Project.find({
+                $or: [
+                    { createdBy: req.user.userId },
+                    { members: req.user.userId }
+                ],
+                isDeleted: false
+            });
+
+            projects.forEach(p => {
+                if (p.clientIds && p.clientIds.length > 0) {
+                    clientIdsToFetch.push(...p.clientIds.map(id => id.toString()));
+                }
+            });
+
+            // unique client ids
+            clientIdsToFetch = [...new Set(clientIdsToFetch)];
+
+            const clients = await User.find({ 
+                _id: { $in: clientIdsToFetch },
+                role: clientRole._id 
+            }).select("-password -otp").populate("role", "name").populate("companyId", "name");
+
+            return res.status(200).json({ users: clients, totalCount: clients.length, success: true });
+        }
+    } catch (error) {
+        console.error("GET ALL CLIENTS ERROR:", error);
+        res.status(500).json({ message: "Error fetching clients", success: false });
     }
 };

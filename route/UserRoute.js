@@ -1,5 +1,5 @@
 import express from "express";
-import { registerUser, loginUser, forgotPassword, resetPassword, adminChangePassword, getAllUsers, getAllUsersByCompany, verifyToken, getUserProfile, updateUserProfile, adminUpdateUser, toggleUserStatus, logoutUser, changePassword, deleteUser, saveFcmToken, getUpcomingEvents } from "../controller/UserController.js";
+import { registerUser, loginUser, forgotPassword, resetPassword, adminChangePassword, getAllUsers, getAllUsersByCompany, verifyToken, getUserProfile, updateUserProfile, adminUpdateUser, toggleUserStatus, logoutUser, changePassword, deleteUser, saveFcmToken, getUpcomingEvents, getAllClients } from "../controller/UserController.js";
 import upload from "../middleware/multer.js";
 import { protect, hasPermission } from "../middleware/authMiddleware.js";
 
@@ -13,6 +13,10 @@ router.post("/reset-password", resetPassword);
 router.get("/logout", logoutUser);
 router.get("/profile", protect, getUserProfile);
 router.put("/profile", protect, upload.single("profilePic"), updateUserProfile);
+
+// Get Clients Route
+router.get("/clients", protect, getAllClients);
+
 router.patch("/change-password", protect, changePassword);
 router.patch("/:id/change-password", protect, hasPermission("UPDATE_USER"), adminChangePassword);
 router.put("/:id", protect, upload.single("finalProposal"), adminUpdateUser);
