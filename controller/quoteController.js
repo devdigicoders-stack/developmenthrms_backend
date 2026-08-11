@@ -225,14 +225,16 @@ export const getAllQuotes = async (req, res) => {
     try {
         const companyId = req.user.company || null; // JWT stores company field
         const { status, search, page = 1, limit = 30 } = req.query;
-        const filter = { companyId: { $in: [companyId, null] } };
 
         const user = await User.findById(req.user.userId).populate("role");
         const isSuperAdmin = user?.role?.name === "super_admin";
         const isAdmin = user?.role?.name === "admin";
 
+        // Build filter — super_admin sees everything, others scoped to company
+        const filter = isSuperAdmin ? {} : { companyId: { $in: [companyId, null] } };
+
         if (isSuperAdmin) {
-            // Sees all company quotes
+            // Sees all quotes across all companies — no extra filter
         } else if (isAdmin) {
             // Hierarchy filter: Admin sees only quotes created by self & subordinates
             const allowedIds = await getSubordinateIds(req.user.userId);

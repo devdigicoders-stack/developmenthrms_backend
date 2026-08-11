@@ -387,6 +387,7 @@ export const getPayrollSummary = async (req, res) => {
             draft: runs.filter(r => r.status === "draft").length,
             approved: runs.filter(r => r.status === "approved").length,
             paid: runs.filter(r => r.status === "paid").length,
+            pending: runs.filter(r => r.status !== "paid").length,
             totalGross: parseFloat(runs.reduce((s, r) => s + r.grossEarnings, 0).toFixed(2)),
             totalDeductions: parseFloat(runs.reduce((s, r) => s + r.totalDeductions, 0).toFixed(2)),
             totalNet: parseFloat(runs.reduce((s, r) => s + r.netSalary, 0).toFixed(2)),
