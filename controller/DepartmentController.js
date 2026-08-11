@@ -106,11 +106,11 @@ export const getDepartments = async (req, res) => {
 
 export const getAllDepartments = async (req, res) => {
     try {
-        const departments = await Department.find()
+        const departments = await Department.find({ isDeleted: false })
             .populate("companyId", "name")
             .populate("createdBy", "firstName lastName email");
 
-        const totalCount = await Department.countDocuments();
+        const totalCount = await Department.countDocuments({ isDeleted: false });
 
         res.status(200).json({
             departments,
@@ -288,10 +288,10 @@ export const getCompanyDepartments = async (req, res) => {
         const user = req.user;
         let departments;
         if(user.role === "super_admin"){
-               departments = await Department.find().populate("companyId", "name").populate("createdBy", "firstName lastName").populate("updatedBy", "firstName lastName");
+               departments = await Department.find({ isDeleted: false }).populate("companyId", "name").populate("createdBy", "firstName lastName").populate("updatedBy", "firstName lastName");
         }
         else{
-            departments = await Department.find({companyId:user.company}).populate("companyId", "name").populate("createdBy", "firstName lastName").populate("updatedBy", "firstName lastName");
+            departments = await Department.find({companyId:user.company, isDeleted: false}).populate("companyId", "name").populate("createdBy", "firstName lastName").populate("updatedBy", "firstName lastName");
         }
             return res.status(200).json({message: "Departments fetched successfully v1",departments,success: true,});
        } catch (error) {
