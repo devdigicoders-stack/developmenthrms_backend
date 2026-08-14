@@ -255,12 +255,15 @@ export const approveLeave = async (req, res) => {
             if (!isManager) return res.status(403).json({ message: "You can only approve leaves for your direct reports", success: false });
         }
 
+        // Atomically update status to prevent race conditions (double clicks)
+        const updatedApp = await LeaveApplication.findOneAndUpdate(
+            { _id: req.params.id, status: "pending" },
+            { status: "approved", approvedBy: req.user.userId, approvedAt: new Date(), updatedBy: req.user.userId },
+            { new: true }
+        );
+        if (!updatedApp) return res.status(400).json({ message: "Application was already processed", success: false });
+
         const employeeId = app.userId._id || app.userId;
-        app.status = "approved";
-        app.approvedBy = req.user.userId;
-        app.approvedAt = new Date();
-        app.updatedBy = req.user.userId;
-        await app.save();
 
         // #1 — Move days from pending → used
         const year = new Date(app.fromDate).getFullYear();
@@ -307,13 +310,15 @@ export const rejectLeave = async (req, res) => {
             if (!isManager) return res.status(403).json({ message: "You can only reject leaves for your direct reports", success: false });
         }
 
+        // Atomically update status to prevent race conditions
+        const updatedApp = await LeaveApplication.findOneAndUpdate(
+            { _id: req.params.id, status: "pending" },
+            { status: "rejected", rejectionReason, approvedBy: req.user.userId, approvedAt: new Date(), updatedBy: req.user.userId },
+            { new: true }
+        );
+        if (!updatedApp) return res.status(400).json({ message: "Application was already processed", success: false });
+
         const employeeId = app.userId._id || app.userId;
-        app.status = "rejected";
-        app.rejectionReason = rejectionReason;
-        app.approvedBy = req.user.userId;
-        app.approvedAt = new Date();
-        app.updatedBy = req.user.userId;
-        await app.save();
 
         // #1 — Release pending days back to available
         const year = new Date(app.fromDate).getFullYear();
@@ -345,10 +350,14 @@ export const cancelLeave = async (req, res) => {
             return res.status(403).json({ message: "You can only cancel your own leave", success: false });
 
         const wasPending  = app.status === "pending";
-        const wasApproved = app.status === "approved";
-        app.status = "cancelled";
-        app.updatedBy = req.user.userId;
-        await app.save();
+        
+        // Atomically update status to prevent race conditions
+        const updatedApp = await LeaveApplication.findOneAndUpdate(
+            { _id: req.params.id, status: "pending" },
+            { status: "cancelled", updatedBy: req.user.userId },
+            { new: true }
+        );
+        if (!updatedApp) return res.status(400).json({ message: "Application was already processed", success: false });
 
         // #1 — Restore balance correctly
         const year = new Date(app.fromDate).getFullYear();
