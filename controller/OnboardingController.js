@@ -326,7 +326,11 @@ export const approveOnboarding = async (req, res) => {
         } catch (mailErr) {
             console.error("Error generating or sending PDF email:", mailErr);
             // Fallback to sending just the email if PDF fails
-            await sendMail({ email: user.email, title: "Offer Letter – Welcome to Digicoder Private Limited", msg: emailMsg });
+            try {
+                await sendMail({ email: user.email, title: "Offer Letter – Welcome to Digicoder Private Limited", msg: emailMsg });
+            } catch (fallbackMailErr) {
+                console.error("Error sending fallback onboarding email:", fallbackMailErr);
+            }
         }
 
         res.status(200).json({ message: "Employee approved successfully", success: true });
