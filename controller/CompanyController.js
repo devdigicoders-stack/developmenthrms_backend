@@ -114,23 +114,7 @@ export const createCompanyWithAdmin = async (req, res) => {
         });
         await adminUser.save();
 
-        // Notify the new admin user
-        await createNotification({
-            userId: adminUser._id,
-            title: "Welcome to HRMS! 🎉",
-            message: `Your company "${companyName}" has been set up. You are the admin. Login to get started.`,
-            type: "company",
-            link: "/",
-            createdBy: req.user.userId,
-        });
-
-        // Send welcome email
-        await sendMail({
-            email: adminEmail,
-            title: "Welcome to HRMS",
-            msg: userCreatedTemplate(adminUser, adminPassword),
-        });
-
+        // Send success response IMMEDIATELY
         res.status(201).json({
             message: "Company, Admin role, and Admin user created successfully",
             company,
@@ -138,6 +122,28 @@ export const createCompanyWithAdmin = async (req, res) => {
             adminUser,
             success: true,
         });
+
+        // Background Task: Notifications and Emails (Does not block response)
+        (async () => {
+            try {
+                await createNotification({
+                    userId: adminUser._id,
+                    title: "Welcome to HRMS! 🎉",
+                    message: `Your company "${companyName}" has been set up. You are the admin. Login to get started.`,
+                    type: "company",
+                    link: "/",
+                    createdBy: req.user.userId,
+                });
+
+                await sendMail({
+                    email: adminEmail,
+                    title: "Welcome to HRMS",
+                    msg: userCreatedTemplate(adminUser, adminPassword),
+                });
+            } catch (backgroundError) {
+                console.error("Error in background notification/email for new company:", backgroundError);
+            }
+        })();
 
     } catch (error) {
         console.error(error);
