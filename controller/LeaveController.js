@@ -334,8 +334,8 @@ export const cancelLeave = async (req, res) => {
     try {
         const app = await LeaveApplication.findById(req.params.id);
         if (!app) return res.status(404).json({ message: "Leave application not found", success: false });
-        if (!["pending", "approved"].includes(app.status))
-            return res.status(400).json({ message: "Cannot cancel this application", success: false });
+        if (app.status !== "pending")
+            return res.status(400).json({ message: "Only pending leaves can be cancelled", success: false });
 
         // Only the owner or admin can cancel
         const reqUser = await getUser(req.user.userId);
@@ -353,7 +353,6 @@ export const cancelLeave = async (req, res) => {
         // #1 — Restore balance correctly
         const year = new Date(app.fromDate).getFullYear();
         if (wasPending)  await LeaveBalance.findOneAndUpdate({ userId: app.userId, leaveTypeId: app.leaveTypeId, year }, { $inc: { pending: -app.days } });
-        if (wasApproved) await LeaveBalance.findOneAndUpdate({ userId: app.userId, leaveTypeId: app.leaveTypeId, year }, { $inc: { used: -app.days } });
 
         res.status(200).json({ message: "Leave cancelled", success: true });
     } catch (err) {
