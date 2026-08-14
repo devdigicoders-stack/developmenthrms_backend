@@ -36,6 +36,7 @@ import ComplaintRoute from './route/ComplaintRoute.js'
 import TicketRoute from './route/TicketRoute.js'
 import PaymentRoute from './route/PaymentRoute.js'
 import AssetRoute from './route/AssetRoute.js'
+import AssetTypeRoute from './route/AssetTypeRoute.js'
 import MeetingRoute from "./route/MeetingRoute.js";
 import SalesReportRoute from "./route/SalesReportRoute.js";
 import ResignationRoute from './route/ResignationRoute.js'
@@ -84,13 +85,14 @@ app.use('/api/leads', LeadRoute);
 app.use('/api/quotes', QuoteRoute);
 app.use("/api/meetings", MeetingRoute);
 app.use("/api/reports/sales", SalesReportRoute);
+app.use("/api/assets", AssetRoute);
+app.use("/api/asset-types", AssetTypeRoute);
 app.use('/api/policies', PolicyRoute);
 app.use('/api/nda', NdaRoute);
 app.use('/api/onboarding', OnboardingRoute);
 app.use('/api/complaints', ComplaintRoute);
 app.use('/api/tickets', TicketRoute);
 app.use('/api/payments', PaymentRoute);
-app.use('/api/assets', AssetRoute)
 app.use('/api/resignations', ResignationRoute);
 app.use('/api/performance', PerformanceRoute);
 

@@ -144,5 +144,9 @@ export const permission = {
         DELETE_QUOTE: "DELETE_QUOTE",
         VIEW_QUOTE: "VIEW_QUOTE",
         VIEW_ALL_QUOTES: "VIEW_ALL_QUOTES",
+    },
+    AssetType: {
+        VIEW_ASSET_TYPE: "VIEW_ASSET_TYPE",
+        MANAGE_ASSET_TYPE: "MANAGE_ASSET_TYPE",
     }
 };
