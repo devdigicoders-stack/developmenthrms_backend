@@ -158,7 +158,7 @@ export const getCompanies = async (req, res) => {
 };
 export const getAllCompanies = async (req, res) => {
     try {
-        const companies = await Company.find()
+        const companies = await Company.find({ isDeleted: false })
             .populate("createdBy", "firstName lastName")
             .populate("updatedBy", "firstName lastName")
             .lean();
