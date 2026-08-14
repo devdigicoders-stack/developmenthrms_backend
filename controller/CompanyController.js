@@ -56,6 +56,12 @@ export const createCompanyWithAdmin = async (req, res) => {
             return res.status(400).json({ message: "All fields are required", success: false });
         }
 
+        // Check if admin user already exists
+        const existingUser = await User.findOne({ email: adminEmail });
+        if (existingUser) {
+            return res.status(400).json({ message: "Admin user already exists with this email", success: false });
+        }
+
         // Check if company exists
         let company = await Company.findOne({ domain: companyDomain });
 
@@ -88,11 +94,7 @@ export const createCompanyWithAdmin = async (req, res) => {
             await adminRole.save();
         }
 
-        // Check if admin user already exists
-        const existingUser = await User.findOne({ email: adminEmail });
-        if (existingUser) {
-            return res.status(400).json({ message: "Admin user already exists", success: false });
-        }
+        // Admin user existence check moved to top of function
 
         // Hash admin password
         const hashedPassword = await bcrypt.hash(adminPassword, 10);
