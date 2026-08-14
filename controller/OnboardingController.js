@@ -304,36 +304,40 @@ export const approveOnboarding = async (req, res) => {
             </html>
         `;
 
-        try {
-            const pdfBuffer = await generateOfferPdfBuffer(pdfHtml);
-            await sendMail({ 
-                email: user.email, 
-                title: "Offer Letter – Welcome to Digicoder Private Limited", 
-                msg: emailMsg,
-                attachments: [
-                    {
-                        filename: `Offer_Letter_${user.firstName}_${user.lastName}.pdf`,
-                        content: pdfBuffer,
-                        contentType: 'application/pdf'
-                    }
-                ]
-            });
-        } catch (mailErr) {
-            console.error("Error generating or sending PDF email:", mailErr);
-            // Fallback to sending just the email if PDF fails
-            try {
-                await sendMail({ email: user.email, title: "Offer Letter – Welcome to Digicoder Private Limited", msg: emailMsg });
-            } catch (fallbackMailErr) {
-                console.error("Error sending fallback onboarding email:", fallbackMailErr);
-            }
-        }
-
-        // Save everything to database only after successful processing
+        // 1. Save everything to database FIRST
         await salary.save();
         await form.save();
         await user.save();
 
+        // 2. Send immediate success response to Frontend
         res.status(200).json({ message: "Employee approved successfully", success: true });
+
+        // 3. Background Task: Generate PDF and Send Email (Doesn't block the response)
+        (async () => {
+            try {
+                const pdfBuffer = await generateOfferPdfBuffer(pdfHtml);
+                await sendMail({ 
+                    email: user.email, 
+                    title: "Offer Letter – Welcome to Digicoder Private Limited", 
+                    msg: emailMsg,
+                    attachments: [
+                        {
+                            filename: `Offer_Letter_${user.firstName}_${user.lastName}.pdf`,
+                            content: pdfBuffer,
+                            contentType: 'application/pdf'
+                        }
+                    ]
+                });
+            } catch (mailErr) {
+                console.error("Error generating or sending PDF email in background:", mailErr);
+                // Fallback to sending just the email if PDF fails
+                try {
+                    await sendMail({ email: user.email, title: "Offer Letter – Welcome to Digicoder Private Limited", msg: emailMsg });
+                } catch (fallbackMailErr) {
+                    console.error("Error sending fallback onboarding email in background:", fallbackMailErr);
+                }
+            }
+        })();
     } catch (error) {
         console.error("Approve Onboarding Error:", error);
         res.status(500).json({ message: "Failed to approve employee", success: false });
