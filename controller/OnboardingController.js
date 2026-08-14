@@ -182,27 +182,22 @@ export const approveOnboarding = async (req, res) => {
             return res.status(400).json({ message: "Already approved", success: false });
         }
 
-        // Approve form
+        // Update form and user status in memory (Not saved yet)
         form.status = "approved";
         form.reviewedBy = req.user.userId;
-        await form.save();
-
-        // Update user status
+        
         const user = form.user;
         user.onboardingStatus = "approved";
-        await user.save();
 
-        // Create Salary Structure
+        // Prepare Salary Structure in memory (Not saved yet)
         const salary = new SalaryStructure({
             userId: user._id,
-            companyId: form.companyId._id,
+            companyId: form.companyId ? form.companyId._id : null,
             ctc: basicSalary, // Setting the overall CTC
             basic: Math.round(basicSalary * 0.4), // 40% of CTC for Basic
             effectiveFrom: new Date().toISOString().slice(0, 7), // "YYYY-MM" format usually
-            earnings: [],
-            deductions: []
+            components: [] // Using components array as per schema
         });
-        await salary.save();
 
         // Send Offer Letter Email
         const emailMsg = `
@@ -332,6 +327,11 @@ export const approveOnboarding = async (req, res) => {
                 console.error("Error sending fallback onboarding email:", fallbackMailErr);
             }
         }
+
+        // Save everything to database only after successful processing
+        await salary.save();
+        await form.save();
+        await user.save();
 
         res.status(200).json({ message: "Employee approved successfully", success: true });
     } catch (error) {
