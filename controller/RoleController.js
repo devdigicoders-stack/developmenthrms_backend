@@ -11,6 +11,20 @@ export const createRole = async (req, res) => {
         if (!name) {
             return res.status(400).json({ message: "Name is required", success: false });
         }
+
+        if (req.user.role !== "super_admin") {
+            const currentUser = await User.findById(req.user.userId).populate("role");
+            const allowedPerms = currentUser?.role?.permissions || [];
+            
+            // Allow empty permissions array, but if any are provided, they must be in allowedPerms
+            if (permissions && Array.isArray(permissions)) {
+                const unauthorized = permissions.filter(p => !allowedPerms.includes(p));
+                if (unauthorized.length > 0) {
+                    return res.status(403).json({ message: "You cannot assign permissions you do not possess.", success: false });
+                }
+            }
+        }
+
         const roleExists = await Role.findOne({ name, companyId });
         if (roleExists) {
             if (roleExists.isdeleted) {
@@ -121,6 +135,17 @@ export const updateRole = async (req, res) => {
             role.name = name;
         }
         if (permissions) {
+            if (req.user.role !== "super_admin") {
+                const currentUser = await User.findById(req.user.userId).populate("role");
+                const allowedPerms = currentUser?.role?.permissions || [];
+                
+                if (Array.isArray(permissions)) {
+                    const unauthorized = permissions.filter(p => !allowedPerms.includes(p));
+                    if (unauthorized.length > 0) {
+                        return res.status(403).json({ message: "You cannot assign permissions you do not possess.", success: false });
+                    }
+                }
+            }
             role.permissions = stripSuperAdminOnlyPermissions(permissions);
         }
         if (status !== undefined) {
