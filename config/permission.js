@@ -54,6 +54,10 @@ export const permission = {
         APPROVE_LEAVE: "APPROVE_LEAVE",
         REJECT_LEAVE: "REJECT_LEAVE",
     },
+    Meeting: {
+        VIEW_MEETING: "VIEW_MEETING",
+        VIEW_ALL_MEETINGS: "VIEW_ALL_MEETINGS",
+    },
     Holiday: {
         Create_HOLIDAY: "Create_HOLIDAY",
         UPDATE_HOLIDAY: "UPDATE_HOLIDAY",

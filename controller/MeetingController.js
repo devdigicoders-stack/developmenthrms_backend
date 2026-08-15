@@ -106,3 +106,44 @@ export const deleteMeeting = async (req, res) => {
         res.status(500).json({ message: "Error deleting meeting", success: false });
     }
 };
+
+// Get all meetings based on permissions
+export const getAllMeetings = async (req, res) => {
+    try {
+        const userId = req.user.userId;
+        const role = req.user.role;
+        let meetings = [];
+
+        if (role === "super_admin") {
+            meetings = await Meeting.find()
+                .populate("leadId", "orgName contactNumber contactPerson")
+                .populate("assignedTo", "firstName lastName profilePic")
+                .populate("createdBy", "firstName lastName")
+                .sort({ date: 1, time: 1 });
+        } else {
+            // dynamically import user to check permissions
+            const { default: User } = await import("../models/UserSchema.js");
+            const userData = await User.findById(userId).populate("role");
+            const perms = userData?.role?.permissions || [];
+
+            if (perms.includes("VIEW_ALL_MEETINGS") || role === "admin") {
+                meetings = await Meeting.find({ companyId: userData.companyId })
+                    .populate("leadId", "orgName contactNumber contactPerson")
+                    .populate("assignedTo", "firstName lastName profilePic")
+                    .populate("createdBy", "firstName lastName")
+                    .sort({ date: 1, time: 1 });
+            } else if (perms.includes("VIEW_MEETING")) {
+                meetings = await Meeting.find({ assignedTo: userId })
+                    .populate("leadId", "orgName contactNumber contactPerson")
+                    .populate("assignedTo", "firstName lastName profilePic")
+                    .populate("createdBy", "firstName lastName")
+                    .sort({ date: 1, time: 1 });
+            }
+        }
+
+        res.status(200).json({ success: true, meetings });
+    } catch (error) {
+        console.error("GET ALL MEETINGS ERROR:", error);
+        res.status(500).json({ message: "Error fetching all meetings", success: false });
+    }
+};
