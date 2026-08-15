@@ -285,16 +285,45 @@ export const toggleDepartmentStatus = async (req, res) => {
 
 export const getCompanyDepartments = async (req, res) => {
     try {
-        const user = req.user;
+        const userId = req.user.userId;
+        const role = req.user.role;
+        
         let departments;
-        if(user.role === "super_admin"){
-               departments = await Department.find({ isDeleted: false }).populate("companyId", "name").populate("createdBy", "firstName lastName").populate("updatedBy", "firstName lastName");
+        
+        if (role === "super_admin") {
+            departments = await Department.find({ isDeleted: false })
+                .populate("companyId", "name")
+                .populate("createdBy", "firstName lastName")
+                .populate("updatedBy", "firstName lastName");
+        } else {
+            const userData = await User.findById(userId).populate("role");
+            if (!userData) {
+                return res.status(404).json({ message: "User not found", success: false });
+            }
+            
+            const perms = userData.role?.permissions || [];
+            
+            if (perms.includes("VIEW_ALL_DEPARTMENTS") || role === "admin") {
+                departments = await Department.find({ companyId: userData.companyId, isDeleted: false })
+                    .populate("companyId", "name")
+                    .populate("createdBy", "firstName lastName")
+                    .populate("updatedBy", "firstName lastName");
+            } else if (perms.includes("VIEW_DEPARTMENT")) {
+                if (!userData.department) {
+                    departments = [];
+                } else {
+                    departments = await Department.find({ _id: userData.department, isDeleted: false })
+                        .populate("companyId", "name")
+                        .populate("createdBy", "firstName lastName")
+                        .populate("updatedBy", "firstName lastName");
+                }
+            } else {
+                departments = [];
+            }
         }
-        else{
-            departments = await Department.find({companyId:user.company, isDeleted: false}).populate("companyId", "name").populate("createdBy", "firstName lastName").populate("updatedBy", "firstName lastName");
-        }
-            return res.status(200).json({message: "Departments fetched successfully v1",departments,success: true,});
-       } catch (error) {
+        
+        return res.status(200).json({ message: "Departments fetched successfully v2", departments, success: true });
+    } catch (error) {
         res.status(500).json({ message: "Internal server error", success: false });
     }
 };
